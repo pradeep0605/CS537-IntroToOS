@@ -5,6 +5,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "pstat.h"
 
 struct {
   struct spinlock lock;
@@ -443,4 +444,24 @@ procdump(void)
   }
 }
 
-
+int
+getpinfo(struct pstat *arg)
+{
+  struct proc *p;
+  int idx = 0;
+  // Loop over process table looking for process to run.
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state == UNUSED) {
+      arg->inuse[idx] = 0;
+      idx++;
+    } else {
+      arg->inuse[idx] = 1;
+      arg->pid[idx] = p->pid;
+      arg->state[idx] = p->state;
+      idx++;
+    }
+  }
+  release(&ptable.lock);
+  return 0;
+}
