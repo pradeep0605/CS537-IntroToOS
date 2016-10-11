@@ -6,12 +6,14 @@
 #include "proc.h"
 #include "spinlock.h"
 #include "pstat.h"
+#include "sysfunc.h"
 
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
+  struct proc* queues [4][NPROC]; // Rule 1
 } ptable;
-
+extern uint starvTicks;
 static struct proc *initproc;
 
 int nextpid = 1;
@@ -99,6 +101,14 @@ userinit(void)
   p->cwd = namei("/");
 
   p->state = RUNNABLE;
+  p->priority = 0; // Rule 6
+  struct proc **q;
+  for(q = &(ptable.queues[0][0]); q < &ptable.queues[0][NPROC]; q++) {
+    if (*q == NULL) {
+      *q = p;
+      break;
+    }
+  }
   release(&ptable.lock);
 }
 
@@ -142,6 +152,15 @@ fork(void)
     np->state = UNUSED;
     return -1;
   }
+  np->priority = 0; // Rule 6
+  struct proc **q;
+  for(q = &(ptable.queues[0][0]); q < &ptable.queues[0][NPROC]; q++) {
+    if (*q == NULL) {
+      *q = np;
+      break;
+    }
+  }
+
   np->sz = proc->sz;
   np->parent = proc;
   *np->tf = *proc->tf;
@@ -157,6 +176,7 @@ fork(void)
   pid = np->pid;
   np->state = RUNNABLE;
   safestrcpy(np->name, proc->name, sizeof(proc->name));
+  //cprintf("Adding to priority 0 [pid:%d] [name:%s]\n", np->pid, np->name);
   return pid;
 }
 
@@ -256,33 +276,208 @@ wait(void)
 void
 scheduler(void)
 {
-  struct proc *p;
-
+  struct proc *p, **q, **r, **lastRR = NULL;
+  int cntr = 0;
+  //static char *states[] = {
+  //[UNUSED]    "unused",
+  //[EMBRYO]    "embryo",
+  //[SLEEPING]  "sleep ",
+  //[RUNNABLE]  "runble",
+  //[RUNNING]   "run   ",
+  //[ZOMBIE]    "zombie"
+  //};
   for(;;){
     // Enable interrupts on this processor.
     sti();
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
 
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
+    cntr = 0; 
+    for(q = &ptable.queues[0][0]; q < &ptable.queues[0][NPROC]; q++, cntr++) {
+      if ((*q) == NULL) continue;
+      p = *q;
+      if (p->state == UNUSED) {
+        *q = NULL;
+        continue;
+      }
+      if(p->state != RUNNABLE) {
+        //cprintf("[PID:%d] : %s\n", p->pid, states[p->state]);
+        continue;
+      }
+      //cprintf("%d:Running prio [0][%d] [pid:%d] [name:%s]\n", p->ticks[0], cntr, p->pid, p->name);
       proc = p;
       switchuvm(p);
       p->state = RUNNING;
+      p->lastTick = sys_uptime();
       swtch(&cpu->scheduler, proc->context);
       switchkvm();
 
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
+      if (p->ticks[0] == 5) {  // Rule 8:Time slice up for priority 0, downgraded to lower priority
+        p->ticks[0] = 0;
+        p->priority++;
+        *q = NULL;
+        //cprintf("Switching prio 0 -> 1 [pid:%d] [name:%s]\n", p->pid, p->name);
+        for(r = &ptable.queues[1][0]; r < &ptable.queues[1][NPROC]; r++) {
+          if (*r == NULL) {
+            *r = p;
+            break;
+          }
+        }
+      }
       proc = 0;
+      break; // Highest priority job run, break from this loop
+    }
+    cntr = 0;
+    if (q == &ptable.queues[0][NPROC]) {  // It went through all higher prio jobs and didn't find any
+      for(q = &ptable.queues[1][0]; q < &ptable.queues[1][NPROC]; q++, cntr++) {
+        if ((*q) == NULL) continue;
+        p = *q;
+        if (p->state == UNUSED) {
+          *q = NULL;
+          continue;
+        }
+        if(p->state != RUNNABLE) {
+          //cprintf("[PID:%d] : %s\n", p->pid, states[p->state]);
+          continue;
+        }
+        //cprintf("%d:Running prio [1][%d] [pid:%d] [name:%s]\n",p->ticks[1],cntr, p->pid, p->name);
+        proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+        p->lastTick = sys_uptime();
+        swtch(&cpu->scheduler, proc->context);
+        switchkvm();
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        if (p->ticks[1] == 5) {  // Rule 8:Time slice up for priority 1, downgraded to lower priority
+          p->ticks[1] = 0;
+          p->priority++;
+          *q = NULL;
+
+          //cprintf("Switching prio 1 -> 2 [pid:%d] [name:%s]\n", p->pid, p->name);
+          for(r = &ptable.queues[2][0]; r < &ptable.queues[2][NPROC]; r++) {
+            if (*r == NULL) {
+              *r = p;
+              break;
+            }
+          }
+        }
+        proc = 0;
+        break; // Highest priority job run, break from this loop
+      }
+    }
+
+    cntr = 0;
+    if (q == &ptable.queues[1][NPROC]) {  // It went through all higher prio jobs and didn't find any
+      for(q = &ptable.queues[2][0]; q < &ptable.queues[2][NPROC]; q++,cntr++) {
+        if ((*q) == NULL) continue;
+        p = *q;
+        if (p->state == UNUSED) {
+          *q = NULL;
+          continue;
+        }
+        if(p->state != RUNNABLE) {
+          //cprintf("[PID:%d] : %s\n", p->pid, states[p->state]);
+          continue;
+        }
+        //cprintf("%d:Running prio [2][%d] [pid:%d] [name:%s]\n",p->ticks[2],cntr, p->pid, p->name);
+        proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+        p->lastTick = sys_uptime();
+        swtch(&cpu->scheduler, proc->context);
+        switchkvm();
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        if (p->ticks[2] == 10) {  // Rule 8:Time slice up for priority 2, downgraded to lower priority
+          p->ticks[2] = 0;
+          p->priority++;
+          *q = NULL;
+
+          //cprintf("Switching prio 2 -> 3 [pid:%d] [name:%s]\n", p->pid, p->name);
+          for(r = &ptable.queues[3][0]; r < &ptable.queues[3][NPROC]; r++) {
+            if (*r == NULL) {
+              *r = p;
+              break;
+            }
+          }
+        }
+        proc = 0;
+        break; // Highest priority job run, break from this loop
+      }
+    }
+
+    cntr = 0;
+    if (q == &ptable.queues[2][NPROC]) {  // It went through all higher prio jobs and didn't find any
+      if (NULL != lastRR) q = lastRR;
+      else q = &ptable.queues[3][0];
+      for(; q < &ptable.queues[3][NPROC]; q++, cntr++) {
+        if ((*q) == NULL) continue;
+        p = *q;
+        if (p->state == UNUSED) {
+          *q = NULL;
+          continue;
+        }
+        if(p->state != RUNNABLE) {
+          //cprintf("[PID:%d] : %s\n", p->pid, states[p->state]);
+          continue;
+        }
+        //cprintf("%d:Running prio [3][%d:] [pid:%d] [name:%s]\n",p->ticks[3], cntr, p->pid, p->name);
+        proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+        p->lastTick = sys_uptime();
+        swtch(&cpu->scheduler, proc->context);
+        switchkvm();
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        if (p->ticks[3] == 20) {  // Rule 8:Time slice up for priority 3
+          p->ticks[3] = 0;
+          if (q == &ptable.queues[3][NPROC-1]) lastRR = &ptable.queues[3][0];
+          else lastRR = ++q;
+        }
+        proc = 0;
+        break;
+      }
+      if (q == &ptable.queues[3][NPROC]) {
+        cntr = 0;
+        for(q = &ptable.queues[3][0]; q < lastRR ; q++,cntr++) {
+          if ((*q) == NULL) continue;
+          p = *q;
+          if (p->state == UNUSED) {
+            *q = NULL;
+            continue;
+          }
+          if(p->state != RUNNABLE) {
+            //cprintf("[PID:%d] : %s\n", p->pid, states[p->state]);
+            continue;
+          }
+
+          //cprintf("%d:Running prio [3][:%d] [pid:%d] [name:%s]\n",p->ticks[3],cntr, p->pid, p->name);
+          proc = p;
+          switchuvm(p);
+          p->state = RUNNING;
+          p->lastTick = sys_uptime();
+          swtch(&cpu->scheduler, proc->context);
+          switchkvm();
+
+          // Process is done running for now.
+          // It should have changed its p->state before coming back.
+          if (p->ticks[3] == 20) {  // Rule 8:Time slice up for priority 3
+            p->ticks[3] = 0;
+            if (q == &ptable.queues[3][NPROC-1]) lastRR = &ptable.queues[3][0];
+            else lastRR = ++q;
+          }
+          proc = 0;
+          break;
+        }
+      }
     }
     release(&ptable.lock);
-
   }
 }
 
@@ -352,6 +547,9 @@ sleep(void *chan, struct spinlock *lk)
   // Go to sleep.
   proc->chan = chan;
   proc->state = SLEEPING;
+  proc->ticks[proc->priority]++;
+  proc->accumulatedTicks[proc->priority]++;
+  //cprintf("Going to sleep [pid:%d] [name:%s]\n",proc->pid, proc->name);
   sched();
 
   // Tidy up.
@@ -459,6 +657,11 @@ getpinfo(struct pstat *arg)
       arg->inuse[idx] = 1;
       arg->pid[idx] = p->pid;
       arg->state[idx] = p->state;
+      arg->priority[idx] = p->priority;
+      int i = 0;
+      for (i = 0; i < 4; i++) {
+        arg->ticks[idx][i] = p->accumulatedTicks[i];
+      }
       idx++;
     }
   }
