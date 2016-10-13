@@ -76,7 +76,7 @@ struct proc {
   char name[16];               // Process name (debugging)
   int priority;                // Priority of this process
   int ticks[4];                // Ticks at each level
-  int accumulatedTicks[4];      // All ticks
+  int accumulatedTicks[4];     // All ticks
   uint lastTick;               // When last run
 };
 
