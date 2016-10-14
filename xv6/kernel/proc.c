@@ -594,8 +594,6 @@ sleep(void *chan, struct spinlock *lk)
   // Go to sleep.
   proc->chan = chan;
   proc->state = SLEEPING;
-  proc->ticks[proc->priority]++;
-  proc->accumulatedTicks[proc->priority]++;
   //cprintf("Going to sleep [pid:%d] [name:%s]\n",proc->pid, proc->name);
   sched();
 
