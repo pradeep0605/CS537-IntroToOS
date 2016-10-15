@@ -273,11 +273,47 @@ wait(void)
 //  - swtch to start running that process
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
+#ifdef GRAPH_DUMP
+int prev_level = 0xff;
+
+void print_timings(struct proc **prev, struct proc *proc) {
+      struct proc *prev_schd_proc = (*prev);
+
+      /* Do not simply clutter the system with first 2 processes' (userinit,
+       * init) logs */
+      if (prev_schd_proc && proc->pid > 2) {
+        int curr_time = sys_uptime() % 100000;
+        if ((prev_schd_proc != proc || prev_level != proc->priority)) {
+        cprintf("KERNEL: EXIT: %d\t-%d\tP%d_e(%d)\t%d.%d\n",
+            curr_time, prev_level, prev_schd_proc->pid, curr_time, 0, 2,
+            prev_schd_proc->pid);
+
+        cprintf("KERNEL: TRANS_EXIT: %d\t-%d\tP%d_e(%d)\t%d.%d\n",
+            curr_time, prev_level, 0, curr_time, 0, 2);
+        //cprintf("KERNEL: EXIT P%d: P%d; \n", 0, 0);
+        cprintf("KERNEL: Entry: %d\t-%d\tP%d_s(%d)\t%d.%d\n",
+            curr_time, proc->priority, 0, curr_time, 0, 1);
+
+        cprintf("KERNEL: EXIT P%d: P%d; \n", proc->pid, proc->pid);
+        /* Print a point for the CPU entering process */
+        cprintf("KERNEL: Entry: %d\t-%d\tP%d_s(%d)\t%d.%d\n",
+            curr_time, proc->priority, proc->pid, curr_time, 0, 1);
+        }
+      }
+      (*prev) = proc;
+      prev_level = proc->priority;
+}
+#endif /* GRAPH_DUMP */
+
 void
 scheduler(void)
 {
   struct proc *p, **q, **r, **lastRR = NULL;
   int cntr = 0;
+  /* Only for the purpose of plotting the graphs */
+#ifdef GRAPH_DUMP
+  struct proc *prev_sched_proc = NULL;
+#endif
 #ifdef SCHD_DEBUG
   static char *states[] = {
   [UNUSED]    "unused",
@@ -317,6 +353,11 @@ scheduler(void)
       switchuvm(p);
       p->state = RUNNING;
       p->lastTick = sys_uptime();
+
+#ifdef GRAPH_DUMP
+      print_timings(&prev_sched_proc, proc);
+#endif
+
       swtch(&cpu->scheduler, proc->context);
       switchkvm();
 
@@ -362,6 +403,10 @@ scheduler(void)
         switchuvm(p);
         p->state = RUNNING;
         p->lastTick = sys_uptime();
+
+#ifdef GRAPH_DUMP
+        print_timings(&prev_sched_proc, proc);
+#endif
         swtch(&cpu->scheduler, proc->context);
         switchkvm();
 
@@ -410,7 +455,12 @@ scheduler(void)
         switchuvm(p);
         p->state = RUNNING;
         p->lastTick = sys_uptime();
+
+#ifdef GRAPH_DUMP
+        print_timings(&prev_sched_proc, proc);
+#endif
         swtch(&cpu->scheduler, proc->context);
+
         switchkvm();
 
         // Process is done running for now.
@@ -467,6 +517,10 @@ scheduler(void)
         switchuvm(p);
         p->state = RUNNING;
         p->lastTick = sys_uptime();
+
+#ifdef GRAPH_DUMP
+        print_timings(&prev_sched_proc, proc);
+#endif
         swtch(&cpu->scheduler, proc->context);
         switchkvm();
 
@@ -506,7 +560,12 @@ scheduler(void)
           switchuvm(p);
           p->state = RUNNING;
           p->lastTick = sys_uptime();
+
+#ifdef GRAPH_DUMP
+          print_timings(&prev_sched_proc, proc);
+#endif
           swtch(&cpu->scheduler, proc->context);
+
           switchkvm();
 
           // Process is done running for now.
