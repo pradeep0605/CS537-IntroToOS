@@ -1,13 +1,23 @@
 #include "stats.h"
 
+sem_t *clnt_srvr_sem;
+extern int shmid;
+extern stats_t *shm;
+
 stats_t* stats_init(key_t key) {
   stats_t* retval = NULL;
-  int shmid;
+  sprintf(output, "%d", key);
+  if ((clnt_srvr_sem =
+    sem_open(output, O_CREAT, S_IRUSR | S_IWUSR, 0)) == NULL) {
+    stats_perror("Sem_open Failed\n");
+    exit(1);
+  }
+  
+  sem_wait(clnt_srvr_sem);
   if ((shmid = shmget(key, 16*sizeof(stats_t), 0666)) < 0) {
     perror("shmget");
     return retval;
   }
-  stats_t* shm;
   if ((shm = (stats_t*)shmat(shmid, NULL, 0)) == (void*)-1) {
     perror("shmat");
     return retval;
@@ -28,21 +38,18 @@ stats_t* stats_init(key_t key) {
     retval->cpu_secs = 0.0;
     retval->in_use = 1;
   }
+  sem_post(clnt_srvr_sem);
+  
   return retval;
 }
 
+/* Unlink is called when ctrl+c is hit */
 int stats_unlink(key_t key) {
-  int shmid;
   int retval = -1;
-  if ((shmid = shmget(key, 16*sizeof(stats_t), 0666)) < 0) {
-    perror("shmget");
-    return retval;
-  }
-  stats_t* shm;
-  if ((shm = (stats_t*)shmat(shmid, NULL, 0)) == (void*)-1) {
-    perror("shmat");
-    return retval;
-  }
+
+  sprintf(output, "%d", key);
+    
+  sem_wait(clnt_srvr_sem);
   int pid = getpid();
   int i;
   for (i = 0; i < 16; i++) {
@@ -52,6 +59,11 @@ int stats_unlink(key_t key) {
       break;
     }
   }
-  /*TODO(pradeep) also call shmdt*/
+  
+  if ((retval = shmdt(shm)) == -1) {
+    stats_perror("shmdt\n");
+  
+  }
+  sem_post(clnt_srvr_sem);
   return retval;
 }

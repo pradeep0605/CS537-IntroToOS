@@ -3,9 +3,9 @@ SRC=$(CURR_DIR)
 SOURCES=$(SRC)/stats_client.c $(SRC)/stats.c $(SRC)/stats_server.c
 
 GCC=gcc
-FLAGS=-g -Wall -gdwarf-2 
+FLAGS=-g -Wall -gdwarf-2 -Wall -Werror -lpthread
 
-all: stats_client stats_server 
+all: stats_client stats_server
 
 stats_server: stats_server.c libstats.so
 	@echo "$(notdir $^) --> $(notdir $@)"
