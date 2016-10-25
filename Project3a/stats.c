@@ -3,17 +3,19 @@
 sem_t *clnt_srvr_sem;
 extern int shmid;
 extern stats_t *shm;
+extern char sem_key[100];
 
 stats_t* stats_init(key_t key) {
   stats_t* retval = NULL;
-  sprintf(output, "%d", key);
+  sprintf(sem_key, "%d", key);
   if ((clnt_srvr_sem =
-    sem_open(output, O_CREAT, S_IRUSR | S_IWUSR, 0)) == NULL) {
+    sem_open(sem_key, O_CREAT, S_IRUSR | S_IWUSR, 0)) == NULL) {
     stats_perror("Sem_open Failed\n");
     exit(1);
   }
   
   sem_wait(clnt_srvr_sem);
+
   if ((shmid = shmget(key, 16*sizeof(stats_t), 0666)) < 0) {
     perror("shmget");
     return retval;
@@ -47,7 +49,6 @@ stats_t* stats_init(key_t key) {
 int stats_unlink(key_t key) {
   int retval = -1;
 
-  sprintf(output, "%d", key);
     
   sem_wait(clnt_srvr_sem);
   int pid = getpid();
@@ -64,6 +65,12 @@ int stats_unlink(key_t key) {
   if ((retval = shmdt(shm)) == -1) {
     stats_perror("shmdt\n");
   }
+
   sem_post(clnt_srvr_sem);
+
+  if (sem_close(clnt_srvr_sem) == -1) {
+    stats_perror("sem_close\n");
+  }
+
   return retval;
 }

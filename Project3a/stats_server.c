@@ -18,6 +18,7 @@ void usage_and_exit() {
   exit(1);
 }
 
+char sem_key[100] = {0};
 int shmid;
 sem_t *clnt_srvr_sem;
 unsigned int key = 0;
@@ -31,8 +32,7 @@ void sigint_handler(int signal) {
     stats_perror("shmctl\n");
     goto exit;
   }
-  
-  sprintf(output, "%d", key);
+  sprintf(sem_key, "%d", key);
   /* Unlink the named semaphore */ 
   
   /* If I have the semaphore and a ctrl+c was hit, then I should sem_post
@@ -43,7 +43,7 @@ void sigint_handler(int signal) {
   sem_getvalue(clnt_srvr_sem, &sem_value);
   stats_perror("SEM HELD BY ME = %d sem_val = %d\n", sem_held_by_me, sem_value);
   */
-  if ((ret = sem_unlink(output)) == -1) {
+  if ((ret = sem_unlink(sem_key)) == -1) {
     stats_perror("sem_unlink\n");
     goto exit;
   }
@@ -69,10 +69,10 @@ main(int argc, char* argv[]) {
     usage_and_exit();
   }
 
-  sprintf(output, "%d", key);
+  sprintf(sem_key, "%d", key);
   /* Create a semaphore with initial value 0 to make clients wait */
   if ((clnt_srvr_sem =
-    sem_open(output, O_CREAT, S_IRUSR | S_IWUSR, 0)) == NULL) {
+    sem_open(sem_key, O_CREAT, S_IRUSR | S_IWUSR, 0)) == NULL) {
     stats_perror("Sem_open Failed\n");
     exit(1);
   }

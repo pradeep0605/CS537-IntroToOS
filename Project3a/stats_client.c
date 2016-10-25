@@ -18,6 +18,7 @@ void usage_and_exit() {
 
 int shmid;
 stats_t *shm;
+char sem_key[100] = {0};
 
 float timeSpecToFloat(struct timespec* t) {
   return (t->tv_sec)+(t->tv_nsec)/1000000000.;
