@@ -115,6 +115,5 @@ main(int argc, char* argv[]) {
       any_client_processed = false;
     }
   }
-  // TODO(pradeep) call shmctl(shmid, IPC_RMID, NULL) in signal handler
   return 0;
 }

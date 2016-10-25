@@ -53,6 +53,7 @@ int stats_unlink(key_t key) {
   int pid = getpid();
   int i;
   for (i = 0; i < 16; i++) {
+    /* Find and free this process's SHM usage */
     if (1 == shm[i].in_use && pid == shm[i].pid) {
       shm[i].in_use = 0;
       retval = 0;
@@ -62,7 +63,6 @@ int stats_unlink(key_t key) {
   
   if ((retval = shmdt(shm)) == -1) {
     stats_perror("shmdt\n");
-  
   }
   sem_post(clnt_srvr_sem);
   return retval;
