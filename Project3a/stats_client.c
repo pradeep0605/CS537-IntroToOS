@@ -72,13 +72,6 @@ main(int argc, char* argv[]) {
   struct timespec till, left, start, now, absStart, duration;
   clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &absStart);
   for (;;) {
-    till.tv_sec = sleeptime / SEC_IN_NS; 
-    till.tv_nsec = sleeptime % SEC_IN_NS;
-    rc = nanosleep(&till, &left);
-    while (rc < 0) {
-      till = left;
-      rc = nanosleep(&till, &left);
-    }
     rc = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
     now = start;
     float now_t = timeSpecToFloat(&now), start_t = timeSpecToFloat(&start);
@@ -97,6 +90,14 @@ main(int argc, char* argv[]) {
     statistics->priority = getpriority(PRIO_PROCESS, pid);
     statistics->cpu_secs = elapsed;
     strncpy(statistics->argv, argv[0], 15);
+ 
+    till.tv_sec = sleeptime / SEC_IN_NS;
+    till.tv_nsec = sleeptime % SEC_IN_NS;
+    rc = nanosleep(&till, &left);
+    while (rc < 0) {
+      till = left;
+      rc = nanosleep(&till, &left);
+    }
   }
   return 0;
 }

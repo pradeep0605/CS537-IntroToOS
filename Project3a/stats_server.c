@@ -102,8 +102,8 @@ main(int argc, char* argv[]) {
     int i;
     for (i = 0; i < 16; i++) {
       if (1 == shm[i].in_use) {
-        stats_printf("%d %d %15s %.2f %d\n",
-            iter, shm[i].pid, shm[i].argv, shm[i].cpu_secs, shm[i].priority);
+        stats_printf("%d %d %15s %d %.2f %d\n", iter, shm[i].pid, shm[i].argv,
+          shm[i].counter, shm[i].cpu_secs, shm[i].priority);
         any_client_processed = true;
       }
     }
