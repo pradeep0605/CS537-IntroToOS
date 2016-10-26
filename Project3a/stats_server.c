@@ -22,11 +22,17 @@ char sem_key[100] = {0};
 int shmid;
 sem_t *clnt_srvr_sem;
 unsigned int key = 0;
+stats_t *shm = NULL;
 
 void sigint_handler(int signal) {
-  int ret = 0;
+  int ret = 0, i = 0;
   if (shmid == 1)
     goto exit;
+
+  /* When Server is exiting, make all the client not in use. */
+  for (i = 0; i < 16; i++) {
+    shm[i].in_use = 0;
+  }
   /* Remove the attached shared memory */
   if ((ret = shmctl(shmid, IPC_RMID, NULL)) == -1) {
     stats_perror("shmctl\n");
@@ -35,14 +41,6 @@ void sigint_handler(int signal) {
   sprintf(sem_key, "%d", key);
   /* Unlink the named semaphore */ 
   
-  /* If I have the semaphore and a ctrl+c was hit, then I should sem_post
-   * before unlinking. Because client processes might just hang because of this.
-   */
-  /*
-  int sem_value = 0;
-  sem_getvalue(clnt_srvr_sem, &sem_value);
-  stats_perror("SEM HELD BY ME = %d sem_val = %d\n", sem_held_by_me, sem_value);
-  */
   if ((ret = sem_unlink(sem_key)) == -1) {
     stats_perror("sem_unlink\n");
     goto exit;
@@ -82,7 +80,6 @@ main(int argc, char* argv[]) {
     exit(1);
   }
 
-  stats_t *shm = NULL;
   if ((shm = (stats_t*) shmat(shmid, NULL, 0)) == (void*)-1) {
     stats_perror("shmat");
     exit(1);

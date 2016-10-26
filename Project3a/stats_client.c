@@ -60,6 +60,10 @@ main(int argc, char* argv[]) {
     }
   }
   stats_t* statistics = stats_init(key);
+  if (statistics == NULL) {
+    stats_perror("Unable to connect to server!\n");
+    exit(1);
+  }
   int pid = getpid();
   int rc = setpriority(PRIO_PROCESS, pid, priority);
   if (rc < 0) {
