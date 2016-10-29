@@ -19,7 +19,7 @@ void usage_and_exit() {
 }
 
 char sem_key[100] = {0};
-int shmid;
+int shmid = 0;
 sem_t *clnt_srvr_sem;
 unsigned int key = 0;
 stats_t *shm = NULL;
@@ -33,14 +33,18 @@ void sigint_handler(int signal) {
   for (i = 0; i < 16; i++) {
     shm[i].in_use = 0;
   }
+
+  if ((ret = shmdt(shm)) == -1) {
+    stats_perror("shmdt\n");
+  }
+
   /* Remove the attached shared memory */
   if ((ret = shmctl(shmid, IPC_RMID, NULL)) == -1) {
     stats_perror("shmctl\n");
     goto exit;
   }
-  sprintf(sem_key, "%d", key);
-  /* Unlink the named semaphore */ 
-  
+  sprintf(sem_key, "%s%d", TEAM_NAME, key);
+  /* Unlink the named semaphore */
   if ((ret = sem_unlink(sem_key)) == -1) {
     stats_perror("sem_unlink\n");
     goto exit;
@@ -67,16 +71,10 @@ main(int argc, char* argv[]) {
     usage_and_exit();
   }
 
-  sprintf(sem_key, "%d", key);
-  /* Create a semaphore with initial value 0 to make clients wait */
-  if ((clnt_srvr_sem =
-    sem_open(sem_key, O_CREAT, S_IRUSR | S_IWUSR, 0)) == NULL) {
-    stats_perror("Sem_open Failed\n");
-    exit(1);
-  }
 
-  if ((shmid = shmget(key, 16 * sizeof(stats_t), IPC_CREAT | 0666)) < 0) {
-    stats_perror("shmget");
+  if ((shmid =
+    shmget(key, 16 * sizeof(stats_t), IPC_CREAT | IPC_EXCL | 0666)) < 0) {
+    stats_perror("Error: %d might already exist !\n", key);
     exit(1);
   }
 
@@ -84,13 +82,22 @@ main(int argc, char* argv[]) {
     stats_perror("shmat");
     exit(1);
   }
-  
+
+  sprintf(sem_key, "%s%d", TEAM_NAME, key);
+  /* Create a semaphore with initial value 0 to make clients wait */
+  if ((clnt_srvr_sem =
+    sem_open(sem_key, O_CREAT, S_IRUSR | S_IWUSR, 0)) == NULL) {
+    stats_perror("Sem_open Failed\n");
+  }
+
   /* To make sure that client do not fail accessing the not-yet created shared
    * memory.
    */
   sem_post(clnt_srvr_sem);
-  /* Handle the ctrl+c interrupt */
+  /* Handle the ctrl+c interrupt and also killed from kill command */
   signal(SIGINT, sigint_handler);
+  signal(SIGKILL, sigint_handler);
+
   unsigned int iter = 1;
   unsigned int any_client_processed = 0;
 

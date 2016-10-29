@@ -7,13 +7,16 @@ extern char sem_key[100];
 
 stats_t* stats_init(key_t key) {
   stats_t* retval = NULL;
-  sprintf(sem_key, "%d", key);
+  sprintf(sem_key, "%s%d", TEAM_NAME, key);
+  /* Try to open an existing semaphore (created by the server. if doesnt exist,
+   * then exit./
+   */
   if ((clnt_srvr_sem =
-    sem_open(sem_key, O_CREAT, S_IRUSR | S_IWUSR, 0)) == NULL) {
-    stats_perror("Sem_open Failed\n");
-    exit(1);
+    sem_open(sem_key, 0, S_IRUSR | S_IWUSR, 0)) == NULL) {
+    /* Server is not running ! so exit */
+    exit(0);
   }
-  
+
   sem_wait(clnt_srvr_sem);
 
   if ((shmid = shmget(key, 16*sizeof(stats_t), 0666)) < 0) {
@@ -41,7 +44,7 @@ stats_t* stats_init(key_t key) {
     retval->in_use = 1;
   }
   sem_post(clnt_srvr_sem);
-  
+
   return retval;
 }
 
@@ -49,7 +52,6 @@ stats_t* stats_init(key_t key) {
 int stats_unlink(key_t key) {
   int retval = -1;
 
-    
   sem_wait(clnt_srvr_sem);
   int pid = getpid();
   int i;
@@ -61,7 +63,7 @@ int stats_unlink(key_t key) {
       break;
     }
   }
-  
+
   if ((retval = shmdt(shm)) == -1) {
     stats_perror("shmdt\n");
   }

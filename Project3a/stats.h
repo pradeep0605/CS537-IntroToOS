@@ -13,6 +13,7 @@
 
 char output[1000] = {0};
 
+#define TEAM_NAME "kashtal"
 #define true 1
 #define false 0
 #define stats_printf(format, ...) \

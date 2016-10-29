@@ -9,7 +9,9 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <signal.h>
-// @brief Function to print out usage_and_exit of this program in case of invalid args
+/* @brief Function to print out usage_and_exit of 
+ * this program in case of invalid args
+ */
 void usage_and_exit() {
   stats_printf("usage_and_exit: stats_client -k key -p priority"
     " -s sleeptime_ns -c cputime_ns\n");
@@ -18,7 +20,7 @@ void usage_and_exit() {
 
 int shmid;
 stats_t *shm;
-char sem_key[100] = {0};
+char sem_key[102] = {0};
 
 float timeSpecToFloat(struct timespec* t) {
   return (t->tv_sec)+(t->tv_nsec)/1000000000.;
@@ -61,7 +63,7 @@ main(int argc, char* argv[]) {
   }
   stats_t* statistics = stats_init(key);
   if (statistics == NULL) {
-    stats_perror("Unable to connect to server!\n");
+    stats_perror("Unable to connect ! Mostly Clients limit exeeded \n");
     exit(1);
   }
   int pid = getpid();
@@ -69,10 +71,11 @@ main(int argc, char* argv[]) {
   if (rc < 0) {
     stats_perror("setpriority");
   }
-  
+
   /* Handle the ctrl+c interrupt */
   signal(SIGINT, sigint_handler);
-  
+  signal(SIGKILL, sigint_handler);
+
   unsigned int count = 0;
   struct timespec till, left, start, now, absStart, duration;
   clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &absStart);
@@ -95,7 +98,7 @@ main(int argc, char* argv[]) {
     statistics->priority = getpriority(PRIO_PROCESS, pid);
     statistics->cpu_secs = elapsed;
     strncpy(statistics->argv, argv[0], 15);
- 
+
     till.tv_sec = sleeptime / SEC_IN_NS;
     till.tv_nsec = sleeptime % SEC_IN_NS;
     rc = nanosleep(&till, &left);
