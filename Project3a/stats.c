@@ -22,10 +22,18 @@ stats_t* stats_init(key_t key) {
 
   if ((shmid = shmget(key, 16*sizeof(stats_t), 0666)) < 0) {
     perror("shmget");
+    sem_post(clnt_srvr_sem);
+    if (sem_close(clnt_srvr_sem) == -1) {
+      stats_perror("sem_close\n");
+    }
     return retval;
   }
   if ((shm = (stats_t*)shmat(shmid, NULL, 0)) == (void*)-1) {
     perror("shmat");
+    sem_post(clnt_srvr_sem);
+    if (sem_close(clnt_srvr_sem) == -1) {
+      stats_perror("sem_close\n");
+    }
     return retval;
   }
 
@@ -42,6 +50,7 @@ stats_t* stats_init(key_t key) {
     retval->counter = 0;
     retval->priority = 0;
     retval->cpu_secs = 0.0;
+    retval->argv[0] = '\0';
     retval->in_use = 1;
   }
   sem_post(clnt_srvr_sem);
@@ -59,6 +68,7 @@ int stats_unlink(key_t key) {
   for (i = 0; i < 16; i++) {
     /* Find and free this process's SHM usage */
     if (1 == shm[i].in_use && pid == shm[i].pid) {
+      // shm[i].in_use = 0;
       shm[i] = zero; /* Clear the entire shm location */
       retval = 0;
       break;

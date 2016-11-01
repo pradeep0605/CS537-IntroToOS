@@ -25,11 +25,12 @@ unsigned int key = 0;
 stats_t *shm = NULL;
 
 void sigint_handler(int signal) {
-  int ret = 0, i = 0;
+  int ret = 0;
   if (shmid == 1)
     goto exit;
 
   /* When Server is exiting, make all the client not in use. */
+  int i = 0;
   for (i = 0; i < MAX_CLIENTS; i++) {
     shm[i].in_use = 0;
   }
