@@ -16,6 +16,7 @@ char output[1000] = {0};
 #define TEAM_NAME "kashtal"
 #define true 1
 #define false 0
+#define MAX_CLIENTS 16
 #define stats_printf(format, ...) \
   sprintf(output, format, ##__VA_ARGS__); \
   if (write(STDOUT_FILENO, output, strlen(output)) == -1) \
@@ -36,7 +37,7 @@ typedef struct {
   double cpu_secs; // Do not remove or change
   // You may add any new fields that you believe are necessary
   int in_use;
-  char argv[16];
+  char argv[MAX_CLIENTS];
 } stats_t;
 
 stats_t* stats_init(key_t key);

@@ -30,7 +30,7 @@ void sigint_handler(int signal) {
     goto exit;
 
   /* When Server is exiting, make all the client not in use. */
-  for (i = 0; i < 16; i++) {
+  for (i = 0; i < MAX_CLIENTS; i++) {
     shm[i].in_use = 0;
   }
 
@@ -86,8 +86,8 @@ main(int argc, char* argv[]) {
   }
 
 
-  if ((shmid =
-    shmget(key, 16 * sizeof(stats_t), IPC_CREAT | IPC_EXCL | 0666)) < 0) {
+  if ((shmid = shmget(key, MAX_CLIENTS* sizeof(stats_t),
+        IPC_CREAT | IPC_EXCL | 0666)) < 0) {
     stats_perror("Error: Another server with key %d already exists !\n", key);
     exit(1);
   }
@@ -120,9 +120,9 @@ main(int argc, char* argv[]) {
 
   for (;;) {
     sleep(1);
-    int i;
     sem_wait(clnt_srvr_sem);
-    for (i = 0; i < 16; i++) {
+    int i;
+    for (i = 0; i < MAX_CLIENTS; i++) {
       /* Client should be active as well as it should process one record before
        * the server starts reading. That is why the check shm[i].counter.
        */
