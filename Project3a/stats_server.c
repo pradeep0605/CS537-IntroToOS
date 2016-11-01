@@ -34,20 +34,29 @@ void sigint_handler(int signal) {
     shm[i].in_use = 0;
   }
 
-  if ((ret = shmdt(shm)) == -1) {
-    stats_perror("shmdt\n");
+  if (shmid && shm) {
+    if ((ret = shmdt(shm)) == -1) {
+      stats_perror("shmdt\n");
+    }
+
+    /* Remove the attached shared memory */
+    if ((ret = shmctl(shmid, IPC_RMID, NULL)) == -1) {
+      stats_perror("shmctl\n");
+      goto exit;
+    }
   }
 
-  /* Remove the attached shared memory */
-  if ((ret = shmctl(shmid, IPC_RMID, NULL)) == -1) {
-    stats_perror("shmctl\n");
-    goto exit;
-  }
-  sprintf(sem_key, "%s%d", TEAM_NAME, key);
-  /* Unlink the named semaphore */
-  if ((ret = sem_unlink(sem_key)) == -1) {
-    stats_perror("sem_unlink\n");
-    goto exit;
+  if (clnt_srvr_sem) {
+    if ((ret = sem_close(clnt_srvr_sem)) == -1) {
+      stats_perror("sem_close\n");
+      goto exit;
+    }
+    sprintf(sem_key, "%s%d", TEAM_NAME, key);
+    /* Unlink the named semaphore */
+    if ((ret = sem_unlink(sem_key)) == -1) {
+      stats_perror("sem_unlink\n");
+      goto exit;
+    }
   }
 exit:
   exit(ret);
@@ -55,7 +64,12 @@ exit:
 
 int
 main(int argc, char* argv[]) {
-  if (argc > 3) usage_and_exit();
+  if (argc > 3) {
+    usage_and_exit();
+  }
+  if (argc != 3) {
+    usage_and_exit();
+  }
   opterr = 0;
   char c;
   while (-1 != (c = getopt(argc, argv, "k:"))) {
@@ -74,7 +88,7 @@ main(int argc, char* argv[]) {
 
   if ((shmid =
     shmget(key, 16 * sizeof(stats_t), IPC_CREAT | IPC_EXCL | 0666)) < 0) {
-    stats_perror("Error: %d might already exist !\n", key);
+    stats_perror("Error: Another server with key %d already exists !\n", key);
     exit(1);
   }
 
@@ -88,6 +102,9 @@ main(int argc, char* argv[]) {
   if ((clnt_srvr_sem =
     sem_open(sem_key, O_CREAT, S_IRUSR | S_IWUSR, 0)) == NULL) {
     stats_perror("Sem_open Failed\n");
+    /* Cleanup and quit */
+    sigint_handler(SIGINT);
+    exit(1);
   }
 
   /* To make sure that client do not fail accessing the not-yet created shared
@@ -95,22 +112,27 @@ main(int argc, char* argv[]) {
    */
   sem_post(clnt_srvr_sem);
   /* Handle the ctrl+c interrupt and also killed from kill command */
-  signal(SIGINT, sigint_handler);
-  signal(SIGKILL, sigint_handler);
+  signal(SIGINT, sigint_handler); /* Ctrl + c */
+  signal(SIGKILL, sigint_handler); /* external kill */
 
   unsigned int iter = 1;
-  unsigned int any_client_processed = 0;
+  unsigned int any_client_processed = false;
 
   for (;;) {
     sleep(1);
     int i;
+    sem_wait(clnt_srvr_sem);
     for (i = 0; i < 16; i++) {
-      if (1 == shm[i].in_use) {
+      /* Client should be active as well as it should process one record before
+       * the server starts reading. That is why the check shm[i].counter.
+       */
+      if (1 == shm[i].in_use && shm[i].counter) {
         stats_printf("%d %d %15s %d %.2f %d\n", iter, shm[i].pid, shm[i].argv,
           shm[i].counter, shm[i].cpu_secs, shm[i].priority);
         any_client_processed = true;
       }
     }
+    sem_post(clnt_srvr_sem);
 
     if (any_client_processed) {
       iter++;
@@ -119,5 +141,8 @@ main(int argc, char* argv[]) {
       any_client_processed = false;
     }
   }
+
+  /* Clean-up and exit */
+  sigint_handler(SIGINT);
   return 0;
 }

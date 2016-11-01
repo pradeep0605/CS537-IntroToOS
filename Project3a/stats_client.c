@@ -38,7 +38,7 @@ int
 main(int argc, char* argv[]) {
   if (argc > 9) usage_and_exit();
   /* Assuming resonable defaults of priority 10, sleep & Cpu of 1 second */
-  unsigned int priority = 10, sleeptime = 1000000000, cputime = 1000000000;
+  unsigned int priority = 0, sleeptime = 1000000000, cputime = 1000000000;
   opterr = 0;
   char c;
   while (-1 != (c = getopt(argc, argv, "k:p:s:c:"))) {
@@ -63,7 +63,7 @@ main(int argc, char* argv[]) {
   }
   stats_t* statistics = stats_init(key);
   if (statistics == NULL) {
-    stats_perror("Unable to connect ! Mostly Clients limit exeeded \n");
+    stats_perror("Unable to connect ! Clients' limit exceeded!\n");
     exit(1);
   }
   int pid = getpid();

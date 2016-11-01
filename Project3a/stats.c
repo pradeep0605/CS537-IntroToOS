@@ -4,6 +4,7 @@ sem_t *clnt_srvr_sem;
 extern int shmid;
 extern stats_t *shm;
 extern char sem_key[100];
+stats_t zero;
 
 stats_t* stats_init(key_t key) {
   stats_t* retval = NULL;
@@ -58,7 +59,7 @@ int stats_unlink(key_t key) {
   for (i = 0; i < 16; i++) {
     /* Find and free this process's SHM usage */
     if (1 == shm[i].in_use && pid == shm[i].pid) {
-      shm[i].in_use = 0;
+      shm[i] = zero; /* Clear the entire shm location */
       retval = 0;
       break;
     }
