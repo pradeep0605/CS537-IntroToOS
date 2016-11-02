@@ -46,7 +46,7 @@ stats_t* stats_init(key_t key) {
   }
 
   if (NULL != retval) {
-    retval->pid = 0;
+    retval->pid = getpid();
     retval->counter = 0;
     retval->priority = 0;
     retval->cpu_secs = 0.0;
@@ -68,7 +68,6 @@ int stats_unlink(key_t key) {
   for (i = 0; i < 16; i++) {
     /* Find and free this process's SHM usage */
     if (1 == shm[i].in_use && pid == shm[i].pid) {
-      // shm[i].in_use = 0;
       shm[i] = zero; /* Clear the entire shm location */
       retval = 0;
       break;

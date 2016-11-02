@@ -37,8 +37,8 @@ void sigint_handler(int signal) {
 int
 main(int argc, char* argv[]) {
   if (argc > 9) usage_and_exit();
-  /* Assuming resonable defaults of priority 10, sleep & Cpu of 1 second */
-  unsigned int priority = 0, sleeptime = 1000000000, cputime = 1000000000;
+  /* Assuming resonable defaults of priority 1, sleep & Cpu of 1 second */
+  unsigned int priority = 1, sleeptime = 1000000000, cputime = 1000000000;
   opterr = 0;
   char c;
   while (-1 != (c = getopt(argc, argv, "k:p:s:c:"))) {
@@ -66,12 +66,8 @@ main(int argc, char* argv[]) {
     stats_perror("Unable to connect ! Clients' limit exceeded!\n");
     exit(1);
   }
-  int pid = getpid();
-  int rc = setpriority(PRIO_PROCESS, pid, priority);
-  if (rc < 0) {
-    stats_perror("setpriority");
-  }
-
+  statistics->priority = priority;
+  strncpy(statistics->argv, argv[0], 15);
   /* Handle the ctrl+c interrupt */
   signal(SIGINT, sigint_handler);
   signal(SIGKILL, sigint_handler);
@@ -80,6 +76,7 @@ main(int argc, char* argv[]) {
   struct timespec till, left, start, now, absStart, duration;
   clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &absStart);
   for (;;) {
+    int rc;
     rc = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
     now = start;
     float now_t = timeSpecToFloat(&now), start_t = timeSpecToFloat(&start);
@@ -93,11 +90,12 @@ main(int argc, char* argv[]) {
     count++;
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &now);
     float elapsed = timeSpecToFloat(&now) - timeSpecToFloat(&absStart);
-    statistics->pid = pid;
     statistics->counter = count;
-    statistics->priority = getpriority(PRIO_PROCESS, pid);
     statistics->cpu_secs = elapsed;
-    strncpy(statistics->argv, argv[0], 15);
+
+    if (setpriority(PRIO_PROCESS, statistics->pid, statistics->priority) < 0) {
+      stats_perror("setpriority");
+    }
 
     till.tv_sec = sleeptime / SEC_IN_NS;
     till.tv_nsec = sleeptime % SEC_IN_NS;
