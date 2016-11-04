@@ -3,7 +3,7 @@ SRC=$(CURR_DIR)
 SOURCES=$(SRC)/stats_client.c $(SRC)/stats.c $(SRC)/stats_server.c
 
 GCC=gcc
-FLAGS=-g -Wall -gdwarf-2 -Wall -Werror -lpthread
+FLAGS=-O2 -Wall -gdwarf-2 -Wall -Werror -lpthread
 
 all: stats_client stats_server
 

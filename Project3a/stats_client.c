@@ -67,12 +67,17 @@ main(int argc, char* argv[]) {
     exit(1);
   }
   statistics->priority = priority;
+  statistics->counter = 1;
   strncpy(statistics->argv, argv[0], 15);
+  statistics->modified = 1;
+  // printf("Modified request for %d %d %d %d\n",
+  // statistics->pid, priority, sleeptime, cputime);
+  // fflush(stdout);
   /* Handle the ctrl+c interrupt */
   signal(SIGINT, sigint_handler);
   signal(SIGKILL, sigint_handler);
 
-  unsigned int count = 0;
+  unsigned int count = 1;
   struct timespec till, left, start, now, absStart, duration;
   clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &absStart);
   for (;;) {
@@ -87,22 +92,23 @@ main(int argc, char* argv[]) {
       clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &now);
       now_t = timeSpecToFloat(&now);
     }
-    count++;
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &now);
-    float elapsed = timeSpecToFloat(&now) - timeSpecToFloat(&absStart);
-    statistics->counter = count;
-    statistics->cpu_secs = elapsed;
-
-    if (setpriority(PRIO_PROCESS, statistics->pid, statistics->priority) < 0) {
-      stats_perror("setpriority");
-    }
-
     till.tv_sec = sleeptime / SEC_IN_NS;
     till.tv_nsec = sleeptime % SEC_IN_NS;
     rc = nanosleep(&till, &left);
     while (rc < 0) {
       till = left;
       rc = nanosleep(&till, &left);
+    }
+    count++;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &now);
+    float elapsed = timeSpecToFloat(&now) - timeSpecToFloat(&absStart);
+    statistics->counter = count;
+    statistics->cpu_secs = elapsed;
+    // statistics->modified = 1;
+
+    if (2 == count &&
+      setpriority(PRIO_PROCESS, statistics->pid, statistics->priority) < 0) {
+      stats_perror("setpriority");
     }
   }
   return 0;

@@ -37,7 +37,8 @@ typedef struct {
   double cpu_secs; // Do not remove or change
   // You may add any new fields that you believe are necessary
   int in_use;
-  char argv[MAX_CLIENTS];
+  char argv[16];
+  int modified;
 } stats_t;
 
 stats_t* stats_init(key_t key);

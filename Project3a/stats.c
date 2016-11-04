@@ -52,6 +52,9 @@ stats_t* stats_init(key_t key) {
     retval->cpu_secs = 0.0;
     retval->argv[0] = '\0';
     retval->in_use = 1;
+    retval->modified = 0;
+    // printf("Received request for %d at %d\n", retval->pid, i);
+    // fflush(stdout);
   }
   sem_post(clnt_srvr_sem);
 
@@ -68,6 +71,8 @@ int stats_unlink(key_t key) {
   for (i = 0; i < 16; i++) {
     /* Find and free this process's SHM usage */
     if (1 == shm[i].in_use && pid == shm[i].pid) {
+      // printf("Received unlink request for %d\n", pid);
+      // fflush(stdout);
       shm[i] = zero; /* Clear the entire shm location */
       retval = 0;
       break;

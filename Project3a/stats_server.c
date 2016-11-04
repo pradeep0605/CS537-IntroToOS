@@ -120,20 +120,20 @@ main(int argc, char* argv[]) {
   unsigned int any_client_processed = false;
 
   for (;;) {
-    sleep(1);
-    sem_wait(clnt_srvr_sem);
     int i;
     for (i = 0; i < MAX_CLIENTS; i++) {
       /* Client should be active as well as it should process one record before
        * the server starts reading. That is why the check shm[i].counter.
        */
-      if (1 == shm[i].in_use && shm[i].counter) {
+      if (1 == shm[i].in_use && shm[i].modified) {
+        // sem_wait(clnt_srvr_sem);
         stats_printf("%d %d %15s %d %.2f %d\n", iter, shm[i].pid, shm[i].argv,
           shm[i].counter, shm[i].cpu_secs, shm[i].priority);
+        // shm[i].modified = 0;
+        // sem_post(clnt_srvr_sem);
         any_client_processed = true;
       }
     }
-    sem_post(clnt_srvr_sem);
 
     if (any_client_processed) {
       iter++;
@@ -141,6 +141,7 @@ main(int argc, char* argv[]) {
       stats_printf("\n");
       any_client_processed = false;
     }
+    sleep(1);
   }
 
   /* Clean-up and exit */
