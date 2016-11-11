@@ -59,6 +59,16 @@ struct context {
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+typedef void (*thread_func_t)(void *);
+
+typedef struct thread {
+  thread_func_t *func;
+  void *arg;
+  void *stack;
+  int tid;
+  int is_thread;
+} thread_t;
+
 // Per-process state
 struct proc {
   uint sz;                     // Size of process memory (bytes)
@@ -74,6 +84,7 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  thread_t thread_info;        // This is valid of this 'proc' is a thread.
 };
 
 // Process memory is laid out contiguously, low addresses first:

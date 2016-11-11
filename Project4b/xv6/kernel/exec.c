@@ -85,6 +85,7 @@ exec(char *path, char **argv)
   proc->pgdir = pgdir;
   proc->sz = sz;
   proc->tf->eip = elf.entry;  // main
+  cprintf("elf.entry = %d (0x%p)\n", elf.entry, elf.entry);
   proc->tf->esp = sp;
   switchuvm(proc);
   freevm(oldpgdir);

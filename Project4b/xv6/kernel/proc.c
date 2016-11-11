@@ -14,6 +14,7 @@ struct {
 static struct proc *initproc;
 
 int nextpid = 1;
+int nexttid = 1;
 extern void forkret(void);
 extern void trapret(void);
 
@@ -443,7 +444,131 @@ procdump(void)
   }
 }
 
-typedef void (*thread_func_t)(void *);
+/*******************************************************************
+ ************* THREAD IMPLEMENTATION STARTS FROM HERE **************
+ *******************************************************************
+ In this implementation, every thread is also considered as a process so that
+ the scheduler can pick one of these threads and schedule like a process. This
+ will give us the cuncurrency required.
+
+ The member of the proc struct are manipulated so that they point to the same
+ process but only necessary things which are essential for threads are changed.
+ */
+
+
+
+// Look in the process table for an UNUSED proc.
+// If found, change state to EMBRYO and initialize
+// state required to run in the kernel.
+// Otherwise return 0.
+static struct proc*
+alloc_thread(struct proc *parent, thread_t *tinfo)
+{
+  struct proc *p;
+  char *sp;
+  // pte_t *pte;
+
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    if(p->state == UNUSED)
+      goto found;
+  release(&ptable.lock);
+  return 0;
+
+found:
+  /* PK: Thread states have to be similar to the process */
+  p->state = EMBRYO;
+  /* PK: A thread shoudl have the same pid as the parent */
+  p->pid = parent->pid;
+  /* PK: Increment the global threadid counter and assign the tid */
+  p->thread_info.tid = nexttid++;
+  
+  release(&ptable.lock);
+
+  /* PK: Point to the bottom of the stack */
+  sp = tinfo->stack + KSTACKSIZE;
+  
+  /* Insert the argument to the thread */
+  sp -= 4;
+  *(uint *) sp = (uint) tinfo->arg;
+
+  sp -= 4;
+  *(uint *) sp = (uint) 0xffffffff;
+
+
+  // Leave room for trap frame.
+  sp -= sizeof *p->tf;
+  p->tf = (struct trapframe*)sp;
+  
+  // Set up new context to start executing at forkret,
+  // which returns to trapret.
+  sp -= 4;
+  *(uint*)sp = (uint)trapret;
+
+  sp -= sizeof *p->context;
+  p->context = (struct context*)sp;
+  memset(p->context, 0, sizeof *p->context);
+  p->context->eip = (uint)forkret;
+
+  cprintf("KERNEL: forktest = %d, trapret = %d\n", forkret, trapret);
+  
+  return p;
+}
+
+/* Create a new thread copying p as the parent.
+ * Sets up stack to return as if from system call.
+ * Caller must set state of returned thread to RUNNABLE.
+ */
+int
+thread_fork(struct proc *proc, thread_t *tinfo)
+{
+  int i, tid;
+  struct proc *np;
+
+  // PK: Allocate a thread.
+  if((np = alloc_thread(proc, tinfo)) == 0)
+    return -1;
+
+  /* PK: make the thread point to the same page table as the process */
+  np->pgdir = proc->pgdir;
+
+  np->sz = proc->sz;
+  /* PK: even the thread will point to the same parent */
+  np->parent = proc->parent;
+  /* TODO: figure out is this right ? Might need to properly setup the trap
+   * frame for the thread. THIS IS THE MAJOR CHANGE THAT WOULD MAKE A THREAD
+   * RUN.
+   */
+  *np->tf = *proc->tf;
+  np->tf->eip = (uint) tinfo->func;
+
+  // Clear %eax so that fork returns 0 in the child.
+  np->tf->eax = 0;
+
+  /* PK : Use the same ofile for the thread as well.
+  TODO: Take care when new files open and old files close in the process as the
+  same has to be done for the thread as well (just copy the values of ofile from
+  the process to the thread).
+  */
+  for (i = 0; i < NOFILE; ++i)
+    np->ofile[i] = proc->ofile[i];
+  /* PK : Thread also points to the same working directory */
+  np->cwd = proc->cwd;
+ 
+  tid = np->thread_info.tid;
+  np->state = RUNNABLE;
+  safestrcpy(np->name, proc->name, sizeof(proc->name));
+  
+  /* PK: Copy the tinfo object */
+  np->thread_info = (*tinfo);
+  /* PK: set is_thread to true so that we can distinguish between thread and a
+   * process.
+   */
+  np->thread_info.is_thread = 1;
+  switchuvm(proc);
+
+  return tid;
+}
 
 
 int sys_clone(void)
@@ -453,6 +578,7 @@ int sys_clone(void)
   int arg_addr;
   int stack_addr;
   */
+  thread_t tinfo;
   thread_func_t *func;
   void *stack;
   void *arg;
@@ -466,9 +592,15 @@ int sys_clone(void)
   if (argint(2,(int *) &stack) < 0)
     return -1;
 
+  tinfo.func = func;
+  tinfo.arg = arg;
+  tinfo.stack = stack;
+
   cprintf("KERNEL: func = %d, arg = %d, stack = %d\n", func, arg, stack);
-  return 0;
+  tinfo = tinfo;
+  return thread_fork(proc, &tinfo);
 }
+
 
 int sys_join(void)
 {

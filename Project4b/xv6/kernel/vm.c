@@ -49,7 +49,7 @@ seginit(void)
 // Return the address of the PTE in page table pgdir
 // that corresponds to linear address va.  If create!=0,
 // create any required page table pages.
-static pte_t *
+pte_t *
 walkpgdir(pde_t *pgdir, const void *va, int create)
 {
   pde_t *pde;

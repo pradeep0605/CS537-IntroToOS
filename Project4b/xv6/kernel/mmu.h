@@ -140,6 +140,8 @@ struct segdesc {
 #define PTE_ADDR(pte)	((uint)(pte) & ~0xFFF)
 
 typedef uint pte_t;
+pte_t *
+walkpgdir(pde_t *pgdir, const void *va, int create);
 
 // Task state segment format
 struct taskstate {
