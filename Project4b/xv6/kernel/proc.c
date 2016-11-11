@@ -443,4 +443,34 @@ procdump(void)
   }
 }
 
+typedef void (*thread_func_t)(void *);
 
+
+int sys_clone(void)
+{
+  /*
+  int func_addr;
+  int arg_addr;
+  int stack_addr;
+  */
+  thread_func_t *func;
+  void *stack;
+  void *arg;
+
+  if (argint(0,(int *) &func) < 0)
+    return -1;
+  
+  if (argint(1,(int *) &arg) < 0)
+    return -1;
+
+  if (argint(2,(int *) &stack) < 0)
+    return -1;
+
+  cprintf("KERNEL: func = %d, arg = %d, stack = %d\n", func, arg, stack);
+  return 0;
+}
+
+int sys_join(void)
+{
+return 0;
+}
