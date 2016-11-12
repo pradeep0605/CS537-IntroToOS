@@ -494,8 +494,7 @@ found:
 
   sp -= 4;
   *(uint *) sp = (uint) 0xffffffff;
-
-
+  
   // Leave room for trap frame.
   sp -= sizeof *p->tf;
   p->tf = (struct trapframe*)sp;
@@ -540,7 +539,16 @@ thread_fork(struct proc *proc, thread_t *tinfo)
    * RUN.
    */
   *np->tf = *proc->tf;
+  /* Clear the first 8 general purpose registers */
+  // memset(np->tf, 0, sizeof(uint) * 8);
+
   np->tf->eip = (uint) tinfo->func;
+  np->tf->esp = (uint) ((tinfo->stack + KSTACKSIZE) - (2 * sizeof(uint)));
+  np->tf->ebp = (uint) ((char *)tinfo->stack) + KSTACKSIZE;
+
+  cprintf("eip = %d(%x), esp = %d(%x), ebp = %d(%x)\n", np->tf->eip, np->tf->eip,
+    np->tf->esp, np->tf->esp, np->tf->ebp, np->tf->ebp);
+
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -550,10 +558,10 @@ thread_fork(struct proc *proc, thread_t *tinfo)
   same has to be done for the thread as well (just copy the values of ofile from
   the process to the thread).
   */
-  for (i = 0; i < NOFILE; ++i)
-    np->ofile[i] = proc->ofile[i];
-  /* PK : Thread also points to the same working directory */
-  np->cwd = proc->cwd;
+  for(i = 0; i < NOFILE; i++)
+    if(proc->ofile[i])
+      np->ofile[i] = filedup(proc->ofile[i]);
+  np->cwd = idup(proc->cwd);
  
   tid = np->thread_info.tid;
   np->state = RUNNABLE;
@@ -565,8 +573,7 @@ thread_fork(struct proc *proc, thread_t *tinfo)
    * process.
    */
   np->thread_info.is_thread = 1;
-  switchuvm(proc);
-
+  
   return tid;
 }
 

@@ -2,8 +2,8 @@
 #include "stat.h"
 #include "user.h"
 
-#define PGSIZE  4096
-#define NPROC 64
+#define PGSIZE  (4096)
+#define NPROC (64)
 
 typedef struct thread {
   void (*func) (void*);
@@ -41,6 +41,7 @@ int thread_create(void (*func) (void*), void *data)
   }
 
   thread->stack = (void *) malloc(PGSIZE);
+  memset(thread->stack, 0, PGSIZE);
   if (thread->stack == NULL) {
     free_thread(thread);
     return -1;
@@ -55,10 +56,6 @@ int thread_create(void (*func) (void*), void *data)
 
   return thread->tid;
 }  
-
-
-
-
 
 
 
