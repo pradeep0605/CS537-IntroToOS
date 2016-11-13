@@ -307,6 +307,8 @@ sched(void)
   if(readeflags()&FL_IF)
     panic("sched interruptible");
   intena = cpu->intena;
+  struct proc *p = proc;
+  proc = p;
   swtch(&proc->context, cpu->scheduler);
   cpu->intena = intena;
 }
@@ -328,7 +330,7 @@ forkret(void)
 {
   // Still holding ptable.lock from scheduler.
   release(&ptable.lock);
-  
+  cprintf("forkret\n");
   // Return to "caller", actually trapret (see allocproc).
 }
 
@@ -490,15 +492,13 @@ found:
   
   release(&ptable.lock);
 
-  /* PK: Point to the bottom of the stack */
-  sp = tinfo->stack + KSTACKSIZE;
+  // Allocate kernel stack if possible.
+  if((p->kstack = kalloc()) == 0){
+    p->state = UNUSED;
+    return 0;
+  }
+  sp = p->kstack + KSTACKSIZE;
   
-  /* Insert the argument to the thread */
-  sp -= 4;
-  *(uint *) sp = (uint) tinfo->arg;
-
-  sp -= 4;
-  *(uint *) sp = (uint) 0xffffffff;
   
   // Leave room for trap frame.
   sp -= sizeof *p->tf;
@@ -512,9 +512,11 @@ found:
   sp -= sizeof *p->context;
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
+  // This means whenever it gets scheduled for the first time, it would
+  // begin execution at forkret.
   p->context->eip = (uint)forkret;
 
-  cprintf("KERNEL: forktest = %d, trapret = %d\n", forkret, trapret);
+  cprintf("KERNEL: forkret = %p, trapret = %p\n", forkret, trapret);
   
   return p;
 }
@@ -524,36 +526,41 @@ found:
  * Caller must set state of returned thread to RUNNABLE.
  */
 int
-thread_fork(struct proc *proc, thread_t *tinfo)
+thread_fork(struct proc *parent_proc, thread_t *tinfo)
 {
   int i, tid;
   struct proc *np;
 
   // PK: Allocate a thread.
-  if((np = allocthread(proc, tinfo)) == 0)
+  if((np = allocthread(parent_proc, tinfo)) == 0)
     return -1;
-
+  cprintf("forking thread\n");
   /* PK: make the thread point to the same page table as the process */
-  np->pgdir = proc->pgdir;
+  np->pgdir = parent_proc->pgdir;
 
-  np->sz = proc->sz;
+  np->sz = parent_proc->sz;
   /* PK: even the thread will point to the same parent */
-  np->parent = proc;
+  np->parent = parent_proc;
   /* TODO: figure out is this right ? Might need to properly setup the trap
    * frame for the thread. THIS IS THE MAJOR CHANGE THAT WOULD MAKE A THREAD
    * RUN.
    */
-  *np->tf = *proc->tf;
+  *np->tf = *parent_proc->tf;
   /* Clear the first 8 general purpose registers */
   // memset(np->tf, 0, sizeof(uint) * 8);
 
   np->tf->eip = (uint) tinfo->func;
-  np->tf->esp = (uint) ((tinfo->stack + KSTACKSIZE) - (2 * sizeof(uint)));
-  np->tf->ebp = (uint) ((char *)tinfo->stack) + KSTACKSIZE;
+  np->tf->esp = (uint) (tinfo->stack + KSTACKSIZE);
+  np->tf->ebp = (uint) (tinfo->stack + KSTACKSIZE);
+  
+  /* Insert the argument to the thread */
+  np->tf->esp -= 4;
+  *(uint *) np->tf->esp = (uint) tinfo->arg;
 
-  cprintf("eip = %d(%x), esp = %d(%x), ebp = %d(%x)\n", np->tf->eip, np->tf->eip,
-    np->tf->esp, np->tf->esp, np->tf->ebp, np->tf->ebp);
+  np->tf->esp -= 4;
+  *(uint *) np->tf->esp = (uint) 0xffffffff;
 
+  cprintf("eip = %d, esp = %d, ebp = %d\n", np->tf->eip, np->tf->esp, np->tf->ebp);
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -564,20 +571,20 @@ thread_fork(struct proc *proc, thread_t *tinfo)
   the process to the thread).
   */
   for(i = 0; i < NOFILE; i++)
-    if(proc->ofile[i])
-      np->ofile[i] = filedup(proc->ofile[i]);
-  np->cwd = idup(proc->cwd);
+    if(parent_proc->ofile[i])
+      np->ofile[i] = filedup(parent_proc->ofile[i]);
+  np->cwd = idup(parent_proc->cwd);
  
-  tid = np->thread_info.tid;
-  np->state = RUNNABLE;
-  safestrcpy(np->name, proc->name, sizeof(proc->name));
-  
   /* PK: Copy the tinfo object */
   np->thread_info = (*tinfo);
   /* PK: set is_thread to true so that we can distinguish between thread and a
    * process.
    */
   np->thread_info.is_thread = 1;
+  
+  tid = np->thread_info.tid;
+  np->state = RUNNABLE;
+  safestrcpy(np->name, parent_proc->name, sizeof(parent_proc->name));
   
   return tid;
 }
@@ -602,7 +609,7 @@ int sys_clone(void)
   tinfo.arg = arg;
   tinfo.stack = stack;
 
-  cprintf("KERNEL: func = %p, arg = %d, stack = %p\n", func, *(int*)arg, stack);
+  cprintf("KERNEL: func = %p, arg = %d, stack = %d\n", func, *(int*)arg, stack+4096);
   tinfo = tinfo;
   return thread_fork(proc, &tinfo);
 }

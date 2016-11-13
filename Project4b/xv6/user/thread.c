@@ -35,7 +35,7 @@ int thread_create(void (*start_routine) (void*), void *data)
     return -1;
   }
   curr_thread->stack = stack;
-  printf(1, "USER: func = %p, arg = %d, stack = %p\n", start_routine, *(int*)data, stack);
+  printf(1, "USER: func = %p, arg = %d, stack = %d\n", start_routine, *(int*)data, stack + 4096);
   curr_thread->tid = clone(start_routine, data, stack);
   return curr_thread->tid;
 }

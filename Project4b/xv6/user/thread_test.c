@@ -2,15 +2,14 @@
 #include "stat.h"
 #include "user.h"
 
-#define NLOOP 12
-#define SLEEP 10
+#define NLOOP 120
 void thread_code(void *arg)
 {
   int N =  *(int *)arg;
   int i = 0;
-  printf(1, "INSIDE THREAD ! YAAAYY !! N = %d &i = %d(%p)\n\n", N, i, &i);
+  printf(1, "thread_code : N = %d &i = %d(%d)\n", N, i, &i);
   for (i = 0; i < N; ++i) {
-    printf(1, "Thread | i = %d | &i= %p\n", i, &i);
+    printf(1, "Thread | i = %d | &i= %d\n", i, &i);
   }
   exit();
 }
