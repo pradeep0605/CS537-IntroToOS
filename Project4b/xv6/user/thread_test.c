@@ -8,11 +8,10 @@ void thread_code(void *arg)
 {
   int N =  *(int *)arg;
   int i = 0;
-  printf(1, "INSIDE THREAD ! YAAAYY !! N = %d &i = %d(%p)\n\n", N, &i, &i);
+  printf(1, "INSIDE THREAD ! YAAAYY !! N = %d &i = %d(%p)\n\n", N, i, &i);
   for (i = 0; i < N; ++i) {
-    printf(1, "Thread | &i = %d | i= %d\n", &i, i);
+    printf(1, "Thread | i = %d | &i= %p\n", i, &i);
   }
-  sleep(100);
   exit();
 }
 
@@ -22,7 +21,6 @@ int main(int argc, char *argv[])
   int N = NLOOP;
   
   tid = thread_create(thread_code, (void*) &N);
-  tid = tid;
   /*
   int i = 0;
   for (i = 0; i < NLOOP; ++i) {
@@ -30,7 +28,7 @@ int main(int argc, char *argv[])
   }
   */
   printf(1, "Parent Sleeping\n");
-  sleep (1000);
+  thread_join(tid);
   printf(1, "Sleeping done\n");
   exit();
 }

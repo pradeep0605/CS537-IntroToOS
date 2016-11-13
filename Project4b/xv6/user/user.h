@@ -41,6 +41,7 @@ void* memset(void*, int, uint);
 void* malloc(uint);
 void free(void*);
 int atoi(const char*);
-int thread_create(void (*func) (void*), void *);
+int thread_create(void (*start_function) (void*), void *);
+int thread_join(int);
 #endif // _USER_H_
 

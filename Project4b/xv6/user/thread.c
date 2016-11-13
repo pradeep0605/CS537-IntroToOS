@@ -2,18 +2,15 @@
 #include "stat.h"
 #include "user.h"
 
-#define PGSIZE  (4096)
+#define PGSIZE (4096)
 #define NPROC (64)
 
 typedef struct thread {
-  void (*func) (void*);
-  void *arg;
   void *stack;
   int tid;
   int in_use;
 } thread_t;
 
-thread_t zero;
 thread_t g_threads[NPROC];
 
 thread_t * alloc_thread()
@@ -28,40 +25,31 @@ thread_t * alloc_thread()
   return NULL;
 }
 
-void free_thread(thread_t* thread)
+int thread_create(void (*start_routine) (void*), void *data)
 {
-  *thread = zero;
+  thread_t* curr_thread = alloc_thread();
+  if (NULL == curr_thread) return -1;
+  void* stack = (void*)malloc(PGSIZE);
+  memset(stack, 0, PGSIZE);
+  if (stack == NULL) {
+    return -1;
+  }
+  curr_thread->stack = stack;
+  printf(1, "USER: func = %p, arg = %d, stack = %p\n", start_routine, *(int*)data, stack);
+  curr_thread->tid = clone(start_routine, data, stack);
+  return curr_thread->tid;
 }
 
-int thread_create(void (*func) (void*), void *data)
+int thread_join(int tid)
 {
-  thread_t *thread = alloc_thread();
-  if (thread == NULL) {
-    return -1;
+  int i = 0;
+  for (i = 0; i < NPROC; ++i) {
+    if (g_threads[i].tid == tid) {
+      g_threads[i].in_use = 0;
+      join(&(g_threads[i].stack));
+      free(g_threads[i].stack);
+      break;
+    }
   }
-
-  thread->stack = (void *) malloc(PGSIZE);
-  memset(thread->stack, 0, PGSIZE);
-  if (thread->stack == NULL) {
-    free_thread(thread);
-    return -1;
-  }
-
-  thread->func = func;
-  thread->arg = data;
-
-  printf(1, "USER: func = %d, arg = %d, stack = %d\n", thread->func,
-    thread->arg, thread->stack);
-  thread->tid = clone(thread->func, thread->arg, thread->stack);
-
-  return thread->tid;
-}  
-
-
-
-
-
-
-
-
-
+  return g_threads[i].tid;
+}

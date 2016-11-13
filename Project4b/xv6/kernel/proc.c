@@ -166,17 +166,19 @@ fork(void)
 void
 exit(void)
 {
-  struct proc *p;
+  struct proc *p, *temp = proc;
   int fd;
 
   if(proc == initproc)
     panic("init exiting");
 
   // Close all open files.
-  for(fd = 0; fd < NOFILE; fd++){
-    if(proc->ofile[fd]){
-      fileclose(proc->ofile[fd]);
-      proc->ofile[fd] = 0;
+  if (temp->thread_info.is_thread == 0) {
+    for(fd = 0; fd < NOFILE; fd++){
+      if(proc->ofile[fd]){
+        fileclose(proc->ofile[fd]);
+        proc->ofile[fd] = 0;
+      }
     }
   }
 
@@ -208,23 +210,26 @@ exit(void)
 int
 wait(void)
 {
-  struct proc *p;
-  int havekids, pid;
-
+  struct proc *p, *temp = proc;
+  int havekids, pid,count=-1;
+  proc = temp;
   acquire(&ptable.lock);
   for(;;){
     // Scan through table looking for zombie children.
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      count++;
       if(p->parent != proc)
         continue;
       havekids = 1;
       if(p->state == ZOMBIE){
         // Found one.
         pid = p->pid;
-        kfree(p->kstack);
-        p->kstack = 0;
-        freevm(p->pgdir);
+        if (p->thread_info.is_thread == 0) {
+          kfree(p->kstack);
+          p->kstack = 0;
+          freevm(p->pgdir);
+        }
         p->state = UNUSED;
         p->pid = 0;
         p->parent = 0;
@@ -462,7 +467,7 @@ procdump(void)
 // state required to run in the kernel.
 // Otherwise return 0.
 static struct proc*
-alloc_thread(struct proc *parent, thread_t *tinfo)
+allocthread(struct proc *parent, thread_t *tinfo)
 {
   struct proc *p;
   char *sp;
@@ -525,7 +530,7 @@ thread_fork(struct proc *proc, thread_t *tinfo)
   struct proc *np;
 
   // PK: Allocate a thread.
-  if((np = alloc_thread(proc, tinfo)) == 0)
+  if((np = allocthread(proc, tinfo)) == 0)
     return -1;
 
   /* PK: make the thread point to the same page table as the process */
@@ -533,7 +538,7 @@ thread_fork(struct proc *proc, thread_t *tinfo)
 
   np->sz = proc->sz;
   /* PK: even the thread will point to the same parent */
-  np->parent = proc->parent;
+  np->parent = proc;
   /* TODO: figure out is this right ? Might need to properly setup the trap
    * frame for the thread. THIS IS THE MAJOR CHANGE THAT WOULD MAKE A THREAD
    * RUN.
@@ -577,33 +582,27 @@ thread_fork(struct proc *proc, thread_t *tinfo)
   return tid;
 }
 
-
 int sys_clone(void)
 {
-  /*
-  int func_addr;
-  int arg_addr;
-  int stack_addr;
-  */
   thread_t tinfo;
   thread_func_t *func;
   void *stack;
   void *arg;
 
-  if (argint(0,(int *) &func) < 0)
+  if (argptr(0, (char**)&func, sizeof(thread_func_t)) < 0)
     return -1;
   
-  if (argint(1,(int *) &arg) < 0)
+  if (argptr(1, (char**)&arg, sizeof(void)) < 0)
     return -1;
 
-  if (argint(2,(int *) &stack) < 0)
+  if (argptr(2, (char**)&stack, sizeof(void)) < 0)
     return -1;
 
   tinfo.func = func;
   tinfo.arg = arg;
   tinfo.stack = stack;
 
-  cprintf("KERNEL: func = %d, arg = %d, stack = %d\n", func, arg, stack);
+  cprintf("KERNEL: func = %p, arg = %d, stack = %p\n", func, *(int*)arg, stack);
   tinfo = tinfo;
   return thread_fork(proc, &tinfo);
 }
@@ -611,5 +610,9 @@ int sys_clone(void)
 
 int sys_join(void)
 {
-return 0;
+  void **stack;
+  if (argptr(0, (char**)&stack, sizeof(void*)) < 0)
+    return -1;
+  wait();
+  return 0;
 }
