@@ -1,6 +1,7 @@
 #include "types.h"
 #include "stat.h"
 #include "user.h"
+#include "x86.h"
 
 #define PGSIZE (4096)
 #define NPROC (64)
@@ -51,4 +52,20 @@ int thread_join(int tid)
     }
   }
   return g_threads[i].tid;
+}
+
+void lock_init(lock_t* lock)
+{
+  lock->locked = 0;
+}
+
+void lock_acquire(lock_t* lock)
+{
+  while(xchg(&lock->locked, 1) != 0)
+    ;
+}
+
+void lock_release(lock_t* lock)
+{
+  lock->locked = 0; 
 }
