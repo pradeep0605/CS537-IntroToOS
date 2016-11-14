@@ -35,7 +35,6 @@ int thread_create(void (*start_routine) (void*), void *data)
     return -1;
   }
   curr_thread->stack = stack;
-  printf(1, "USER: func = %p, arg = %d, stack = %d\n", start_routine, *(int*)data, stack + 4096);
   curr_thread->tid = clone(start_routine, data, stack);
   return curr_thread->tid;
 }
@@ -45,8 +44,8 @@ int thread_join(int tid)
   int i = 0;
   for (i = 0; i < NPROC; ++i) {
     if (g_threads[i].tid == tid) {
-      g_threads[i].in_use = 0;
       join(&(g_threads[i].stack));
+      g_threads[i].in_use = 0;
       free(g_threads[i].stack);
       break;
     }

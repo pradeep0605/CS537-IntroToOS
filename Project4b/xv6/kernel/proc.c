@@ -487,8 +487,6 @@ found:
   p->state = EMBRYO;
   /* PK: A thread shoudl have the same pid as the parent */
   p->pid = parent->pid;
-  /* PK: Increment the global threadid counter and assign the tid */
-  p->thread_info.tid = nexttid++;
   
   release(&ptable.lock);
 
@@ -582,6 +580,7 @@ thread_fork(struct proc *parent_proc, thread_t *tinfo)
    */
   np->thread_info.is_thread = 1;
   
+  np->thread_info.tid = nexttid++;
   tid = np->thread_info.tid;
   np->state = RUNNABLE;
   safestrcpy(np->name, parent_proc->name, sizeof(parent_proc->name));
