@@ -17,6 +17,7 @@ USER_PROGS := \
 	usertests\
 	wc\
 	zombie\
+  check \
   thread_test\
   exec_test
 

@@ -23,6 +23,8 @@ int main(int argc, char *argv[])
   lock_init(&l);
   tid = thread_create(thread_code, (void*)"A");
   tid1 = thread_create(thread_code, (void*)"B");
+  tid1 = tid;
+  tid = tid1;
   /*
   int i = 0;
   for (i = 0; i < NLOOP; ++i) {
@@ -30,8 +32,7 @@ int main(int argc, char *argv[])
   }
   */
   printf(1, "Parent Sleeping\n");
-  thread_join(tid);
-  thread_join(tid1);
+  thread_join();
   printf(1, "Sleeping done\n");
   exit();
 }

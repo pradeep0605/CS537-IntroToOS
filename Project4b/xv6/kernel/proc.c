@@ -608,17 +608,26 @@ int sys_clone(void)
   tinfo.arg = arg;
   tinfo.stack = stack;
 
-  cprintf("KERNEL: func = %p, arg = %d, stack = %d\n", func, *(int*)arg, stack+4096);
   tinfo = tinfo;
   return thread_fork(proc, &tinfo);
 }
-
 
 int sys_join(void)
 {
   void **stack;
   if (argptr(0, (char**)&stack, sizeof(void*)) < 0)
     return -1;
+  struct proc* p;
+  int retval = 0;
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    if(p->thread_info.is_thread == 1 && p->pid == proc->pid) {
+      *stack = p->thread_info.stack;
+      retval = p->thread_info.tid;
+      break;
+    }
+  }
+  release(&ptable.lock);
   wait();
-  return 0;
+  return retval;
 }
