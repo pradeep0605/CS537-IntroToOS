@@ -108,7 +108,8 @@ int
 growproc(int n)
 {
   uint sz;
-  
+  // TODO (karan) Find a way to somehow get this sz 
+  // updated in child and parent threads 
   sz = proc->sz;
   if(n > 0){
     if((sz = allocuvm(proc->pgdir, sz, sz + n)) == 0)
@@ -330,7 +331,6 @@ forkret(void)
 {
   // Still holding ptable.lock from scheduler.
   release(&ptable.lock);
-  cprintf("forkret\n");
   // Return to "caller", actually trapret (see allocproc).
 }
 
@@ -514,8 +514,6 @@ found:
   // begin execution at forkret.
   p->context->eip = (uint)forkret;
 
-  cprintf("KERNEL: forkret = %p, trapret = %p\n", forkret, trapret);
-  
   return p;
 }
 
@@ -532,7 +530,6 @@ thread_fork(struct proc *parent_proc, thread_t *tinfo)
   // PK: Allocate a thread.
   if((np = allocthread(parent_proc, tinfo)) == 0)
     return -1;
-  cprintf("forking thread\n");
   /* PK: make the thread point to the same page table as the process */
   np->pgdir = parent_proc->pgdir;
 
@@ -558,8 +555,6 @@ thread_fork(struct proc *parent_proc, thread_t *tinfo)
   np->tf->esp -= 4;
   *(uint *) np->tf->esp = (uint) 0xffffffff;
 
-  cprintf("eip = %d, esp = %d, ebp = %d\n", np->tf->eip, np->tf->esp, np->tf->ebp);
-
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
@@ -570,8 +565,8 @@ thread_fork(struct proc *parent_proc, thread_t *tinfo)
   */
   for(i = 0; i < NOFILE; i++)
     if(parent_proc->ofile[i])
-      np->ofile[i] = filedup(parent_proc->ofile[i]);
-  np->cwd = idup(parent_proc->cwd);
+      np->ofile[i] = parent_proc->ofile[i];
+  np->cwd = parent_proc->cwd;
  
   /* PK: Copy the tinfo object */
   np->thread_info = (*tinfo);
@@ -624,7 +619,6 @@ int sys_join(void)
     if(p->thread_info.is_thread == 1 && p->pid == proc->pid) {
       *stack = p->thread_info.stack;
       retval = p->thread_info.tid;
-      break;
     }
   }
   release(&ptable.lock);

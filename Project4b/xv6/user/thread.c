@@ -45,17 +45,19 @@ int thread_create(void (*start_routine) (void*), void *data)
 int thread_join()
 {
   int i = 0;
+  int retval = 0;
   for (i = 0; i < NPROC; ++i) {
     if (g_threads[i].parent_pid == getpid()) {
-      join(&(g_threads[i].stack));
+      void* stack = NULL;
+      join(&(stack));
       g_threads[i].in_use = 0;
       g_threads[i].parent_pid = 0;
       free(g_threads[i].stack);
       g_threads[i].stack = NULL;
-      break;
+      retval = g_threads[i].tid;
     }
   }
-  return g_threads[i].tid;
+  return retval;
 }
 
 void lock_init(lock_t* lock)
