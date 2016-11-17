@@ -630,6 +630,7 @@ int sys_join(void)
     if(p->thread_info.is_thread == 1 && p->pid == proc->pid) {
       *stack = p->thread_info.stack;
       retval = p->thread_info.tid;
+      break;
     }
   }
   release(&ptable.lock);

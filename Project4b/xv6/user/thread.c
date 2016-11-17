@@ -55,6 +55,7 @@ int thread_join()
       free(g_threads[i].stack);
       g_threads[i].stack = NULL;
       retval = g_threads[i].tid;
+      break;
     }
   }
   return retval;
