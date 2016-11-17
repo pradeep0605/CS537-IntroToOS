@@ -237,9 +237,9 @@ wait(void)
       if(p->state == ZOMBIE){
         // Found one.
         pid = p->pid;
+        kfree(p->kstack);
+        p->kstack = 0;
         if (p->thread_info.is_thread == 0) {
-          kfree(p->kstack);
-          p->kstack = 0;
           freevm(p->pgdir);
         }
         p->state = UNUSED;
