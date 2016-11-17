@@ -15,6 +15,7 @@ static struct proc *initproc;
 
 int nextpid = 1;
 int nexttid = 1;
+int wait_for_thread = 0;
 extern void forkret(void);
 extern void trapret(void);
 
@@ -229,6 +230,8 @@ wait(void)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       count++;
       if(p->parent != proc)
+        continue;
+      if(1 == wait_for_thread && p->thread_info.is_thread == 0)
         continue;
       havekids = 1;
       if(p->state == ZOMBIE){
@@ -630,6 +633,8 @@ int sys_join(void)
     }
   }
   release(&ptable.lock);
+  wait_for_thread = 1;
   wait();
+  wait_for_thread = 0;
   return retval;
 }
