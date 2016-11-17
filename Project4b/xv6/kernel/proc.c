@@ -119,6 +119,14 @@ growproc(int n)
       return -1;
   }
   proc->sz = sz;
+  struct proc* p;
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    if (proc->pid == p->pid) {
+      p->sz = proc->sz;
+    }
+  }
+  release(&ptable.lock);
   switchuvm(proc);
   return 0;
 }
