@@ -16,6 +16,8 @@ union header {
   Align x;
 };
 
+lock_t alloc_lock;
+
 typedef union header Header;
 
 static Header base;
@@ -26,6 +28,8 @@ free(void *ap)
 {
   Header *bp, *p;
 
+  lock_acquire(&alloc_lock);
+  
   bp = (Header*)ap - 1;
   for(p = freep; !(bp > p && bp < p->s.ptr); p = p->s.ptr)
     if(p >= p->s.ptr && (bp > p || bp < p->s.ptr))
@@ -41,6 +45,8 @@ free(void *ap)
   } else
     p->s.ptr = bp;
   freep = p;
+  
+  lock_release(&alloc_lock);
 }
 
 static Header*
@@ -56,7 +62,9 @@ morecore(uint nu)
     return 0;
   hp = (Header*)p;
   hp->s.size = nu;
+  lock_release(&alloc_lock);
   free((void*)(hp + 1));
+  lock_acquire(&alloc_lock);
   return freep;
 }
 
@@ -65,6 +73,8 @@ malloc(uint nbytes)
 {
   Header *p, *prevp;
   uint nunits;
+  
+  lock_acquire(&alloc_lock);
 
   nunits = (nbytes + sizeof(Header) - 1)/sizeof(Header) + 1;
   if((prevp = freep) == 0){
@@ -81,10 +91,15 @@ malloc(uint nbytes)
         p->s.size = nunits;
       }
       freep = prevp;
+      lock_release(&alloc_lock);
       return (void*)(p + 1);
     }
     if(p == freep)
-      if((p = morecore(nunits)) == 0)
+      if((p = morecore(nunits)) == 0) {
+        lock_release(&alloc_lock);
         return 0;
+      }
   }
+  
+  lock_release(&alloc_lock);
 }

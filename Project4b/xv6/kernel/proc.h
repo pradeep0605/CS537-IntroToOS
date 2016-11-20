@@ -65,7 +65,6 @@ typedef struct thread {
   thread_func_t *func;
   void *arg;
   void *stack;
-  int tid;
   int is_thread;
 } thread_t;
 

@@ -14,8 +14,6 @@ struct {
 static struct proc *initproc;
 
 int nextpid = 1;
-int nexttid = 1;
-int wait_for_thread = 0;
 extern void forkret(void);
 extern void trapret(void);
 
@@ -190,9 +188,15 @@ exit(void)
         proc->ofile[fd] = 0;
       }
     }
+
+    /* This is decrementing proc->cwd->ref. When we try to run the same process
+     * again, it will trap at 0x001017e1 in ilock (ip=0x10ed94 <icache+52>)
+     * at kernel/fs.c:243, because the ref count is < 1. So do not do this for a
+     * thread.
+     */
+    iput(proc->cwd);
   }
 
-  iput(proc->cwd);
   proc->cwd = 0;
 
   acquire(&ptable.lock);
@@ -220,18 +224,15 @@ exit(void)
 int
 wait(void)
 {
-  struct proc *p, *temp = proc;
-  int havekids, pid,count=-1;
-  proc = temp;
+  struct proc *p;
+  int havekids, pid;
+
   acquire(&ptable.lock);
   for(;;){
     // Scan through table looking for zombie children.
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      count++;
       if(p->parent != proc)
-        continue;
-      if(1 == wait_for_thread && p->thread_info.is_thread == 0)
         continue;
       havekids = 1;
       if(p->state == ZOMBIE){
@@ -239,9 +240,7 @@ wait(void)
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
-        if (p->thread_info.is_thread == 0) {
-          freevm(p->pgdir);
-        }
+        freevm(p->pgdir);
         p->state = UNUSED;
         p->pid = 0;
         p->parent = 0;
@@ -494,10 +493,9 @@ allocthread(struct proc *parent, thread_t *tinfo)
   return 0;
 
 found:
-  /* PK: Thread states have to be similar to the process */
+  /*  Thread states have to be similar to the process */
   p->state = EMBRYO;
-  /* PK: A thread shoudl have the same pid as the parent */
-  p->pid = parent->pid;
+  p->pid = nextpid++;
   
   release(&ptable.lock);
 
@@ -535,7 +533,7 @@ found:
 int
 thread_fork(struct proc *parent_proc, thread_t *tinfo)
 {
-  int i, tid;
+  int i, pid;
   struct proc *np;
 
   // PK: Allocate a thread.
@@ -555,6 +553,9 @@ thread_fork(struct proc *parent_proc, thread_t *tinfo)
   /* Clear the first 8 general purpose registers */
   // memset(np->tf, 0, sizeof(uint) * 8);
 
+  /* Below 3 lines are the most important code which will make the new thread
+   * start at the given function on the given stack.
+   */
   np->tf->eip = (uint) tinfo->func;
   np->tf->esp = (uint) (tinfo->stack + KSTACKSIZE);
   np->tf->ebp = (uint) (tinfo->stack + KSTACKSIZE);
@@ -586,12 +587,11 @@ thread_fork(struct proc *parent_proc, thread_t *tinfo)
    */
   np->thread_info.is_thread = 1;
   
-  np->thread_info.tid = nexttid++;
-  tid = np->thread_info.tid;
+  pid = np->pid;
   np->state = RUNNABLE;
   safestrcpy(np->name, parent_proc->name, sizeof(parent_proc->name));
   
-  return tid;
+  return pid;
 }
 
 int sys_clone(void)
@@ -621,21 +621,48 @@ int sys_clone(void)
 int sys_join(void)
 {
   void **stack;
+  struct proc *p;
+  int havekids, pid;
+
   if (argptr(0, (char**)&stack, sizeof(void*)) < 0)
     return -1;
-  struct proc* p;
-  int retval = 0;
+  
   acquire(&ptable.lock);
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-    if(p->thread_info.is_thread == 1 && p->pid == proc->pid) {
-      *stack = p->thread_info.stack;
-      retval = p->thread_info.tid;
-      break;
+  for(;;){
+    // Scan through table looking for zombie children.
+    havekids = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->parent != proc)
+        continue;
+      /* Only search for child threads (not child processes) */
+      if (p->thread_info.is_thread == 0)
+        continue;
+      havekids = 1;
+      if (p->state == ZOMBIE) {
+        // Found one.
+        pid = p->pid;
+        kfree(p->kstack);
+        p->kstack = 0;
+        // freevm(p->pgdir);
+        p->state = UNUSED;
+        p->pid = 0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+        *stack = p->thread_info.stack;
+        p->thread_info.is_thread = 0;
+        release(&ptable.lock);
+        return pid;
+      }
     }
+
+    // No point waiting if we don't have any children.
+    if(!havekids || proc->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+
+    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+    sleep(proc, &ptable.lock);  //DOC: wait-sleep
   }
-  release(&ptable.lock);
-  wait_for_thread = 1;
-  wait();
-  wait_for_thread = 0;
-  return retval;
 }

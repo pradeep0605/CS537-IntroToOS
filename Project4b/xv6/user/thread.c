@@ -8,7 +8,7 @@
 
 typedef struct thread {
   void *stack;
-  int tid;
+  int pid;
   int parent_pid;
   int in_use;
 } thread_t;
@@ -38,26 +38,16 @@ int thread_create(void (*start_routine) (void*), void *data)
     return -1;
   }
   curr_thread->stack = stack;
-  curr_thread->tid = clone(start_routine, data, stack);
-  return curr_thread->tid;
+  curr_thread->pid = clone(start_routine, data, stack);
+  return curr_thread->pid;
 }
 
 int thread_join()
 {
-  int i = 0;
   int retval = 0;
-  for (i = 0; i < NPROC; ++i) {
-    if (g_threads[i].parent_pid == getpid()) {
-      void* stack = NULL;
-      join(&(stack));
-      g_threads[i].in_use = 0;
-      g_threads[i].parent_pid = 0;
-      free(g_threads[i].stack);
-      g_threads[i].stack = NULL;
-      retval = g_threads[i].tid;
-      break;
-    }
-  }
+  void *stack;
+  retval = join(&stack);
+  free(stack);
   return retval;
 }
 
