@@ -49,6 +49,34 @@ free(void *ap)
   lock_release(&alloc_lock);
 }
 
+/* This function is written to just for morecore. Because morecore is being
+ * called from malloc. Thus if we try to acquire lock again in free, there will
+ * be deadlocks. To avoid this copy of free is made with no locks and morecore
+ * will call this function instead. This will help in achieveing thread free
+ * code (mutual exclusion) and avoiding deadlcok.
+ */
+void
+copy_of_free(void *ap)
+{
+  Header *bp, *p;
+
+  bp = (Header*)ap - 1;
+  for(p = freep; !(bp > p && bp < p->s.ptr); p = p->s.ptr)
+    if(p >= p->s.ptr && (bp > p || bp < p->s.ptr))
+      break;
+  if(bp + bp->s.size == p->s.ptr){
+    bp->s.size += p->s.ptr->s.size;
+    bp->s.ptr = p->s.ptr->s.ptr;
+  } else
+    bp->s.ptr = p->s.ptr;
+  if(p + p->s.size == bp){
+    p->s.size += bp->s.size;
+    p->s.ptr = bp->s.ptr;
+  } else
+    p->s.ptr = bp;
+  freep = p;
+}
+
 static Header*
 morecore(uint nu)
 {
@@ -62,9 +90,7 @@ morecore(uint nu)
     return 0;
   hp = (Header*)p;
   hp->s.size = nu;
-  lock_release(&alloc_lock);
-  free((void*)(hp + 1));
-  lock_acquire(&alloc_lock);
+  copy_of_free((void*)(hp + 1));
   return freep;
 }
 
