@@ -14,7 +14,16 @@
 #include "include/stat.h"
 #undef stat
 #undef dirent
-
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BINARY(byte)  \
+  (byte & 0x80 ? '1' : '0'), \
+  (byte & 0x40 ? '1' : '0'), \
+  (byte & 0x20 ? '1' : '0'), \
+  (byte & 0x10 ? '1' : '0'), \
+  (byte & 0x08 ? '1' : '0'), \
+  (byte & 0x04 ? '1' : '0'), \
+  (byte & 0x02 ? '1' : '0'), \
+  (byte & 0x01 ? '1' : '0') 
 char output[1000] = {0};
 #define BLOCK_SIZE (512)
 
@@ -41,15 +50,29 @@ void* rsect (uint sect, void* img_ptr) {
   return img_ptr + (sect*BSIZE);
 }
 
+void check_balloced(uint block, void* img_ptr) {
+  char* bitmap = rsect(BBLOCK(block, ninodes), img_ptr);
+  uint off = block / 8;
+  uint bit_off = block % 8;
+  if (0x01 != ((bitmap[off] >> (bit_off)) & 0x01)) {
+    fscheck_perror("ERROR: address used by inode but marked free in bitmap.\n");
+    exit(1);
+  }
+  //printf ("bl:%d, bp:"BYTE_TO_BINARY_PATTERN"\n", block, BYTE_TO_BINARY(bitmap[off]));
+  return;
+}
+
 int seen_root = 0;
 void check_dir_inode (uint inode_num, struct dinode* dip, void* img_ptr) {
   uint file_size = dip->size;
   uint n_blocks = file_size / 512;
-  int i;
+  int i = 0;
   char *buf;
+  uint* indirect = NULL;
+  if (n_blocks > NDIRECT) indirect = rsect(dip->addrs[NDIRECT], img_ptr);
   int seen_self_dir = 0, seen_parent_dir = 0;
-  if (n_blocks < NDIRECT) {
-    for (i=0; i< n_blocks; i++) {
+  for (i=0; i< n_blocks; i++) {
+    if (i < NDIRECT) {
       buf = rsect(dip->addrs[i], img_ptr);
       struct xv6_dirent *dir_entry = (struct xv6_dirent*)buf;
       while (0 != dir_entry->inum) {
@@ -58,7 +81,21 @@ void check_dir_inode (uint inode_num, struct dinode* dip, void* img_ptr) {
           seen_parent_dir = 1;
           if (0 == seen_root && dir_entry->inum == inode_num && inode_num == 1) seen_root = 1;
         }
-//        printf ("%d,%s,%d\n",inode_num, dir_entry->name, dir_entry->inum);
+        //printf ("%d,%s,%d\n",inode_num, dir_entry->name, dir_entry->inum);
+        dir_entry++;
+      }
+    }
+    else {
+      uint curr_addr = indirect[i-NDIRECT];
+      buf = rsect(curr_addr, img_ptr);
+      struct xv6_dirent *dir_entry = (struct xv6_dirent*)buf;
+      while (0 != dir_entry->inum) {
+        if (0 == seen_self_dir && (0 == strcmp(dir_entry->name, "."))) seen_self_dir = 1;
+        if (0 == seen_parent_dir && (0 == strcmp(dir_entry->name, ".."))) {
+          seen_parent_dir = 1;
+          if (0 == seen_root && dir_entry->inum == inode_num && inode_num == 1) seen_root = 1;
+        }
+        //printf ("%d,%s,%d\n",inode_num, dir_entry->name, dir_entry->inum);
         dir_entry++;
       }
     }
@@ -66,6 +103,44 @@ void check_dir_inode (uint inode_num, struct dinode* dip, void* img_ptr) {
   if (!(seen_self_dir & seen_parent_dir)) {
     fscheck_perror("directory not properly formatted.\n");
     exit(1);
+  }
+}
+
+void check_inode_addrs(struct dinode* dip, void* img_ptr) {
+  uint file_size = dip->size;
+  uint n_blocks = file_size / 512;
+  int i;
+  char *buf; 
+  uint* indirect = NULL;
+  if (n_blocks > NDIRECT) {
+    uint curr_addr = dip->addrs[NDIRECT];
+    //printf ("D->I Addr:%d\n", curr_addr);
+    if (curr_addr < 29 || curr_addr > 1024) {
+      fscheck_perror("ERROR: bad address in inode.\n");
+      exit(1);
+    }
+    check_balloced(curr_addr, img_ptr);
+    indirect = rsect(curr_addr, img_ptr);
+  }
+  for (i=0; i< n_blocks; i++) {
+    if (i < NDIRECT) {
+      //printf ("D Addr:%d\n", dip->addrs[i]);
+      uint curr_addr = dip->addrs[i];
+      if (curr_addr < 29 || curr_addr > 1024) {
+        fscheck_perror("ERROR: bad address in inode.\n");
+        exit(1);
+      }
+      check_balloced(curr_addr, img_ptr);
+    }
+    else {
+      //printf ("I Addr%d\n", indirect[i-NDIRECT]);
+      uint curr_addr = indirect[i-NDIRECT];
+      if (curr_addr < 29 || curr_addr > 1024) {
+        fscheck_perror("ERROR: bad address in inode.\n");
+        exit(1);
+      }
+      check_balloced(curr_addr, img_ptr);
+    }
   }
 }
 
@@ -90,21 +165,31 @@ main(int argc, char* argv[]) {
   assert(img_ptr != MAP_FAILED);
 
   struct superblock* sb = (struct superblock*)rsect(1, img_ptr);
-
+  //fscheck_perror("ERROR: bad inode.\n");
+  //exit(1);
   int i;
   struct dinode *dip = (struct dinode*)rsect(2, img_ptr);
   for (i = 0; i< sb->ninodes; i++) {
     switch(dip->type) {
       case 0:
-      case T_FILE:
-      case T_DEV:
         break;
+      case T_DEV:
+      case T_FILE: {
+        //printf ("File addresses\n");
+        check_inode_addrs(dip, img_ptr);
+        //printf ("File addresses end\n");
+        break;
+      }
       case T_DIR: {
+        //printf ("Dir addresses\n");
+        check_inode_addrs(dip, img_ptr);
+        //printf ("Dir addresses end\n");
         check_dir_inode (i, dip, img_ptr);
         break;
       }
       default:
-      fscheck_perror("bad inode.\n");
+      fscheck_perror("ERROR: bad inode.\n");
+      exit(1);
     }
     dip++;
   }
