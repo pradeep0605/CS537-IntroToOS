@@ -62,6 +62,49 @@ void check_balloced(uint block, void* img_ptr) {
   return;
 }
 
+void check_parent_dir(uint parent_inode, uint child_inode, void* img_ptr) {
+  struct dinode* inode_start = (struct dinode*)rsect(2, img_ptr);
+  struct dinode* dip = &(inode_start[parent_inode]);
+  uint seen_child = 0;
+  if (dip->type == T_DIR) {
+    uint file_size = dip->size;
+    uint n_blocks = file_size / 512;
+    int i = 0;
+    char *buf;
+    uint* indirect = NULL;
+    if (n_blocks > NDIRECT) indirect = rsect(dip->addrs[NDIRECT], img_ptr);
+    for (i=0; i< n_blocks; i++) {
+      if (i < NDIRECT) {
+        buf = rsect(dip->addrs[i], img_ptr);
+        struct xv6_dirent *dir_entry = (struct xv6_dirent*)buf;
+        while (0 != dir_entry->inum) {
+          if (dir_entry->inum == child_inode) {
+            seen_child = 1;
+            break;
+          }
+          dir_entry++;
+        }
+      }
+      else {
+        uint curr_addr = indirect[i-NDIRECT];
+        buf = rsect(curr_addr, img_ptr);
+        struct xv6_dirent *dir_entry = (struct xv6_dirent*)buf;
+        while (0 != dir_entry->inum) {
+          if (dir_entry->inum == child_inode) {
+            seen_child = 1;
+            break;
+          }
+          dir_entry++;
+        }
+      }
+    }
+  }
+  if (0 == seen_child) {
+    fscheck_perror("ERROR: parent directory mismatch.\n");
+    exit(1);
+  }
+}
+
 int seen_root = 0;
 void check_dir_inode (uint inode_num, struct dinode* dip, void* img_ptr) {
   uint file_size = dip->size;
@@ -80,6 +123,7 @@ void check_dir_inode (uint inode_num, struct dinode* dip, void* img_ptr) {
         if (0 == seen_parent_dir && (0 == strcmp(dir_entry->name, ".."))) {
           seen_parent_dir = 1;
           if (0 == seen_root && dir_entry->inum == inode_num && inode_num == 1) seen_root = 1;
+          check_parent_dir(dir_entry->inum, inode_num, img_ptr);
         }
         //printf ("%d,%s,%d\n",inode_num, dir_entry->name, dir_entry->inum);
         dir_entry++;
@@ -101,7 +145,7 @@ void check_dir_inode (uint inode_num, struct dinode* dip, void* img_ptr) {
     }
   }
   if (!(seen_self_dir & seen_parent_dir)) {
-    fscheck_perror("directory not properly formatted.\n");
+    fscheck_perror("ERROR: directory not properly formatted.\n");
     exit(1);
   }
 }
