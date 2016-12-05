@@ -59,6 +59,10 @@ void check_balloced(uint block, void* img_ptr) {
     fscheck_perror("ERROR: address used by inode but marked free in bitmap.\n");
     exit(1);
   }
+  if (0x0 == ((my_bitmap[off] >> (bit_off)) & 0x01)) {
+    fscheck_perror("ERROR: address used more than once.\n");
+    exit(1);
+  }
   my_bitmap[off] &= (~(0x1 << bit_off));
   //printf ("bl:%d, bp:"BYTE_TO_BINARY_PATTERN"\n", block, BYTE_TO_BINARY(bitmap[off]));
   return;
@@ -215,7 +219,7 @@ main(int argc, char* argv[]) {
   //exit(1);
   char* bitmap = rsect(28, img_ptr);
   int i;
-  for (i=0; i < 64; i++) {
+  for (i=0; i < 512; i++) {
       my_bitmap[i] = bitmap[i];
       //printf ("%d,mybp:"BYTE_TO_BINARY_PATTERN", bp:"BYTE_TO_BINARY_PATTERN"\n", i, BYTE_TO_BINARY(my_bitmap[i]), BYTE_TO_BINARY(bitmap[i]));
   }
@@ -251,7 +255,7 @@ main(int argc, char* argv[]) {
   for (i=0; i< 29; i++) {
     check_balloced(i, img_ptr);
   }
-  for (i=0; i < 64; i++) {
+  for (i=0; i < 512; i++) {
     //printf ("%d,mybp:"BYTE_TO_BINARY_PATTERN", bp:"BYTE_TO_BINARY_PATTERN"\n", i,BYTE_TO_BINARY(my_bitmap[i]), BYTE_TO_BINARY(bitmap[i]));
     if (my_bitmap[i] != 0) {
       //printf ("%d,mybp:"BYTE_TO_BINARY_PATTERN", bp:"BYTE_TO_BINARY_PATTERN"\n", i,BYTE_TO_BINARY(my_bitmap[i]), BYTE_TO_BINARY(bitmap[i]));
