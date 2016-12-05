@@ -51,6 +51,14 @@ void* rsect (uint sect, void* img_ptr) {
   return img_ptr + (sect*BSIZE);
 }
 
+void check_inode_alloced (uint inode_num, void* img_ptr) {
+  struct dinode *dip = (struct dinode*)rsect(2, img_ptr);
+  if (0 == dip[inode_num].type) {
+    fscheck_perror("ERROR: inode referred to in directory but marked free.\n");
+    exit(1);
+  }
+}
+
 void check_balloced(uint block, void* img_ptr) {
   char* bitmap = rsect(BBLOCK(block, ninodes), img_ptr);
   uint off = block / 8;
@@ -131,6 +139,7 @@ void check_dir_inode (uint inode_num, struct dinode* dip, void* img_ptr) {
           if (0 == seen_root && dir_entry->inum == inode_num && inode_num == 1) seen_root = 1;
           check_parent_dir(dir_entry->inum, inode_num, img_ptr);
         }
+        check_inode_alloced(dir_entry->inum, img_ptr);
         //printf ("%d,%s,%d\n",inode_num, dir_entry->name, dir_entry->inum);
         dir_entry++;
       }
@@ -144,7 +153,9 @@ void check_dir_inode (uint inode_num, struct dinode* dip, void* img_ptr) {
         if (0 == seen_parent_dir && (0 == strcmp(dir_entry->name, ".."))) {
           seen_parent_dir = 1;
           if (0 == seen_root && dir_entry->inum == inode_num && inode_num == 1) seen_root = 1;
+          check_parent_dir(dir_entry->inum, inode_num, img_ptr);
         }
+        check_inode_alloced(dir_entry->inum, img_ptr);
         //printf ("%d,%s,%d\n",inode_num, dir_entry->name, dir_entry->inum);
         dir_entry++;
       }
