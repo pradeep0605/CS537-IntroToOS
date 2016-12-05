@@ -30,6 +30,7 @@ char output[1000] = {0};
 int nblocks = 995;
 int ninodes = 200;
 int size = 1024;
+char my_bitmap[512];
 #define fscheck_printf(format, ...) \
   sprintf(output, format, ##__VA_ARGS__); \
   if (write(STDOUT_FILENO, output, strlen(output)) == -1) \
@@ -58,6 +59,7 @@ void check_balloced(uint block, void* img_ptr) {
     fscheck_perror("ERROR: address used by inode but marked free in bitmap.\n");
     exit(1);
   }
+  my_bitmap[off] &= (~(0x1 << bit_off));
   //printf ("bl:%d, bp:"BYTE_TO_BINARY_PATTERN"\n", block, BYTE_TO_BINARY(bitmap[off]));
   return;
 }
@@ -153,8 +155,8 @@ void check_dir_inode (uint inode_num, struct dinode* dip, void* img_ptr) {
 void check_inode_addrs(struct dinode* dip, void* img_ptr) {
   uint file_size = dip->size;
   uint n_blocks = file_size / 512;
+  if (file_size % 512) n_blocks++;
   int i;
-  char *buf; 
   uint* indirect = NULL;
   if (n_blocks > NDIRECT) {
     uint curr_addr = dip->addrs[NDIRECT];
@@ -168,8 +170,8 @@ void check_inode_addrs(struct dinode* dip, void* img_ptr) {
   }
   for (i=0; i< n_blocks; i++) {
     if (i < NDIRECT) {
-      //printf ("D Addr:%d\n", dip->addrs[i]);
       uint curr_addr = dip->addrs[i];
+      //printf ("D Addr:%d\n", curr_addr);
       if (curr_addr < 29 || curr_addr > 1024) {
         fscheck_perror("ERROR: bad address in inode.\n");
         exit(1);
@@ -177,8 +179,8 @@ void check_inode_addrs(struct dinode* dip, void* img_ptr) {
       check_balloced(curr_addr, img_ptr);
     }
     else {
-      //printf ("I Addr%d\n", indirect[i-NDIRECT]);
       uint curr_addr = indirect[i-NDIRECT];
+      //printf ("I Addr%d\n", curr_addr); 
       if (curr_addr < 29 || curr_addr > 1024) {
         fscheck_perror("ERROR: bad address in inode.\n");
         exit(1);
@@ -211,7 +213,12 @@ main(int argc, char* argv[]) {
   struct superblock* sb = (struct superblock*)rsect(1, img_ptr);
   //fscheck_perror("ERROR: bad inode.\n");
   //exit(1);
+  char* bitmap = rsect(28, img_ptr);
   int i;
+  for (i=0; i < 64; i++) {
+      my_bitmap[i] = bitmap[i];
+      //printf ("%d,mybp:"BYTE_TO_BINARY_PATTERN", bp:"BYTE_TO_BINARY_PATTERN"\n", i, BYTE_TO_BINARY(my_bitmap[i]), BYTE_TO_BINARY(bitmap[i]));
+  }
   struct dinode *dip = (struct dinode*)rsect(2, img_ptr);
   for (i = 0; i< sb->ninodes; i++) {
     switch(dip->type) {
@@ -240,6 +247,17 @@ main(int argc, char* argv[]) {
   if (0 == seen_root) {
     fscheck_perror("ERROR: root directory does not exist.\n");
     exit(1);
+  }
+  for (i=0; i< 29; i++) {
+    check_balloced(i, img_ptr);
+  }
+  for (i=0; i < 64; i++) {
+    //printf ("%d,mybp:"BYTE_TO_BINARY_PATTERN", bp:"BYTE_TO_BINARY_PATTERN"\n", i,BYTE_TO_BINARY(my_bitmap[i]), BYTE_TO_BINARY(bitmap[i]));
+    if (my_bitmap[i] != 0) {
+      //printf ("%d,mybp:"BYTE_TO_BINARY_PATTERN", bp:"BYTE_TO_BINARY_PATTERN"\n", i,BYTE_TO_BINARY(my_bitmap[i]), BYTE_TO_BINARY(bitmap[i]));
+      fscheck_perror("ERROR: bitmap marks block in use but it is not in use.\n");
+      exit(1);
+    }
   }
   return 0;
 }
