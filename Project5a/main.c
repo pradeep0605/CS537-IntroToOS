@@ -33,6 +33,7 @@ int size = 1024;
 char my_bitmap[512];
 //char my_inode[200];
 char my_inode_alloced[200];
+char my_dir_parent_inode[200];
 #define fscheck_printf(format, ...) \
   sprintf(output, format, ##__VA_ARGS__); \
   if (write(STDOUT_FILENO, output, strlen(output)) == -1) \
@@ -127,6 +128,7 @@ void check_parent_dir(uint parent_inode, uint child_inode, void* img_ptr) {
 
 int seen_root = 0;
 void check_dir_inode (uint inode_num, struct dinode* dip, void* img_ptr) {
+  struct dinode* inode_start = (struct dinode*)rsect(2, img_ptr);
   uint file_size = dip->size;
   uint n_blocks = file_size / 512;
   if (file_size % 512) n_blocks++;
@@ -141,10 +143,19 @@ void check_dir_inode (uint inode_num, struct dinode* dip, void* img_ptr) {
       struct xv6_dirent *dir_entry = (struct xv6_dirent*)buf;
       while (0 != dir_entry->inum) {
         if (0 == seen_self_dir && (0 == strcmp(dir_entry->name, "."))) seen_self_dir = 1;
-        if (0 == seen_parent_dir && (0 == strcmp(dir_entry->name, ".."))) {
+        else if (0 == seen_parent_dir && (0 == strcmp(dir_entry->name, ".."))) {
           seen_parent_dir = 1;
           if (0 == seen_root && dir_entry->inum == inode_num && inode_num == 1) seen_root = 1;
           check_parent_dir(dir_entry->inum, inode_num, img_ptr);
+        } else {
+          if (inode_start[dir_entry->inum].type == T_DIR) {
+            if (my_dir_parent_inode[dir_entry->inum] == 0) {
+              my_dir_parent_inode[dir_entry->inum] = inode_num;
+            } else {
+              fscheck_perror("ERROR: directory appears more than once in file system.\n");
+              exit(1);
+            }
+          }
         }
         check_inode_alloced(dir_entry->inum, img_ptr);
         my_inode_alloced[dir_entry->inum] = 0;
@@ -158,10 +169,19 @@ void check_dir_inode (uint inode_num, struct dinode* dip, void* img_ptr) {
       struct xv6_dirent *dir_entry = (struct xv6_dirent*)buf;
       while (0 != dir_entry->inum) {
         if (0 == seen_self_dir && (0 == strcmp(dir_entry->name, "."))) seen_self_dir = 1;
-        if (0 == seen_parent_dir && (0 == strcmp(dir_entry->name, ".."))) {
+        else if (0 == seen_parent_dir && (0 == strcmp(dir_entry->name, ".."))) {
           seen_parent_dir = 1;
           if (0 == seen_root && dir_entry->inum == inode_num && inode_num == 1) seen_root = 1;
           check_parent_dir(dir_entry->inum, inode_num, img_ptr);
+        } else {
+          if (inode_start[dir_entry->inum].type == T_DIR) {
+            if (my_dir_parent_inode[dir_entry->inum] == 0) {
+              my_dir_parent_inode[dir_entry->inum] = inode_num;
+            } else {
+              fscheck_perror("ERROR: directory appears more than once in file system.\n");
+              exit(1);
+            }
+          }
         }
         check_inode_alloced(dir_entry->inum, img_ptr);
         my_inode_alloced[dir_entry->inum] = 0;
