@@ -31,7 +31,7 @@ int nblocks = 995;
 int ninodes = 200;
 int size = 1024;
 char my_bitmap[512];
-//char my_inode[200];
+char my_inode[200];
 char my_inode_alloced[200];
 char my_dir_parent_inode[200];
 #define fscheck_printf(format, ...) \
@@ -60,10 +60,10 @@ void check_inode_alloced (uint inode_num, void* img_ptr) {
     fscheck_perror("ERROR: inode referred to in directory but marked free.\n");
     exit(1);
   }
-  //if (T_FILE == dip[inode_num].type) {
-  //  my_inode[inode_num]--;
-  //  //printf("%d found. Left %d\n", inode_num, my_inode[inode_num]);
-  //}
+  if (T_FILE == dip[inode_num].type) {
+    my_inode[inode_num]--;
+   // printf("%d found. Left %d\n", inode_num, my_inode[inode_num]);
+  }
 }
 
 void check_balloced(uint block, void* img_ptr) {
@@ -141,7 +141,9 @@ void check_dir_inode (uint inode_num, struct dinode* dip, void* img_ptr) {
     if (i < NDIRECT) {
       buf = rsect(dip->addrs[i], img_ptr);
       struct xv6_dirent *dir_entry = (struct xv6_dirent*)buf;
-      while (0 != dir_entry->inum) {
+      int j;
+      for (j=0; j<512/sizeof(struct xv6_dirent); j++) {
+        if (0 == dir_entry->inum) break;
         if (0 == seen_self_dir && (0 == strcmp(dir_entry->name, "."))) seen_self_dir = 1;
         else if (0 == seen_parent_dir && (0 == strcmp(dir_entry->name, ".."))) {
           seen_parent_dir = 1;
@@ -167,7 +169,9 @@ void check_dir_inode (uint inode_num, struct dinode* dip, void* img_ptr) {
       uint curr_addr = indirect[i-NDIRECT];
       buf = rsect(curr_addr, img_ptr);
       struct xv6_dirent *dir_entry = (struct xv6_dirent*)buf;
-      while (0 != dir_entry->inum) {
+      int j;
+      for (j=0; j<512/sizeof(struct xv6_dirent); j++) {
+        if (0 == dir_entry->inum) break;
         if (0 == seen_self_dir && (0 == strcmp(dir_entry->name, "."))) seen_self_dir = 1;
         else if (0 == seen_parent_dir && (0 == strcmp(dir_entry->name, ".."))) {
           seen_parent_dir = 1;
@@ -266,10 +270,10 @@ main(int argc, char* argv[]) {
   struct dinode *dip = (struct dinode*)rsect(2, img_ptr);
   for (i = 0; i< sb->ninodes; i++ ) {
     if (dip[i].type) my_inode_alloced[i] = 1;
-    //if (dip[i].type == T_FILE) {
-    //  my_inode[i] = dip[i].nlink;
-    //  //printf("%d:%d referred %d times\n", dip[i].type, i, dip[i].nlink);
-    //}
+    if (dip[i].type == T_FILE) {
+      my_inode[i] = dip[i].nlink;
+      //printf("%d:%d referred %d times\n", dip[i].type, i, dip[i].nlink);
+    }
   }
   for (i = 0; i< sb->ninodes; i++) {
     switch(dip->type) {
@@ -312,15 +316,15 @@ main(int argc, char* argv[]) {
   }
   for (i= 0; i< 200; i++) {
     if (1 == my_inode_alloced[i]) {
-      fscheck_perror("%d:ERROR: inode marked use but not found in a directory.\n", i);
+      fscheck_perror("ERROR: inode marked use but not found in a directory.\n");
       exit(1);
     }
   }
-  //for (i= 0; i< 200; i++) {
-  //  if (0 < my_inode[i]) {
-  //    fscheck_perror("%d:ERROR: bad reference count for file.\n",i);
-  //    exit(1);
-  //  }
-  //}
+  for (i= 0; i< 200; i++) {
+    if (0 < my_inode[i]) {
+      fscheck_perror("ERROR: bad reference count for file.\n");
+      exit(1);
+    }
+  }
   return 0;
 }
