@@ -26,7 +26,7 @@
   (byte & 0x01 ? '1' : '0') 
 char output[1000] = {0};
 #define BLOCK_SIZE (512)
-
+int parent_mismatch_seen = 0;
 int nblocks = 995;
 int ninodes = 200;
 int size = 1024;
@@ -90,6 +90,7 @@ void check_parent_dir(uint parent_inode, uint child_inode, void* img_ptr) {
   if (dip->type == T_DIR) {
     uint file_size = dip->size;
     uint n_blocks = file_size / 512;
+    if (file_size % 512) n_blocks++;
     int i = 0;
     char *buf;
     uint* indirect = NULL;
@@ -98,19 +99,38 @@ void check_parent_dir(uint parent_inode, uint child_inode, void* img_ptr) {
       if (i < NDIRECT) {
         buf = rsect(dip->addrs[i], img_ptr);
         struct xv6_dirent *dir_entry = (struct xv6_dirent*)buf;
-        while (0 != dir_entry->inum) {
+        int j;
+        for (j=0; j<512/sizeof(struct xv6_dirent); j++) {
+          if (0 == dir_entry->inum) break;
+          if (0 == strcmp(dir_entry->name, "..")) {
+            dir_entry++;
+            continue;
+          }
+          if (0 == strcmp(dir_entry->name, ".")) {
+            dir_entry++;
+            continue;
+          }
           if (dir_entry->inum == child_inode) {
             seen_child = 1;
             break;
           }
           dir_entry++;
         }
-      }
-      else {
+      } else {
         uint curr_addr = indirect[i-NDIRECT];
         buf = rsect(curr_addr, img_ptr);
         struct xv6_dirent *dir_entry = (struct xv6_dirent*)buf;
-        while (0 != dir_entry->inum) {
+        int j;
+        for (j=0; j<512/sizeof(struct xv6_dirent); j++) {
+          if (0 == dir_entry->inum) break;
+          if (0 == strcmp(dir_entry->name, "..")) {
+            dir_entry++;
+            continue;
+          }
+          if (0 == strcmp(dir_entry->name, ".")) {
+            dir_entry++;
+            continue;
+          }
           if (dir_entry->inum == child_inode) {
             seen_child = 1;
             break;
@@ -120,9 +140,8 @@ void check_parent_dir(uint parent_inode, uint child_inode, void* img_ptr) {
       }
     }
   }
-  if (0 == seen_child) {
-    fscheck_perror("ERROR: parent directory mismatch.\n");
-    exit(1);
+  if (0 == seen_child && child_inode != 1) {
+    parent_mismatch_seen = 1;
   }
 }
 
@@ -261,7 +280,7 @@ main(int argc, char* argv[]) {
   struct superblock* sb = (struct superblock*)rsect(1, img_ptr);
   //fscheck_perror("ERROR: bad inode.\n");
   //exit(1);
-  char* bitmap = rsect(28, img_ptr);
+  char* bitmap = rsect(BBLOCK(1, sb->ninodes), img_ptr);
   int i;
   for (i=0; i < 512; i++) {
       my_bitmap[i] = bitmap[i];
@@ -303,6 +322,10 @@ main(int argc, char* argv[]) {
     fscheck_perror("ERROR: root directory does not exist.\n");
     exit(1);
   }
+  if (1 == parent_mismatch_seen) {
+    fscheck_perror("ERROR: parent directory mismatch.\n");
+    exit(1);
+  }
   for (i=0; i< 29; i++) {
     check_balloced(i, img_ptr);
   }
@@ -321,7 +344,7 @@ main(int argc, char* argv[]) {
     }
   }
   for (i= 0; i< 200; i++) {
-    if (0 < my_inode[i]) {
+    if (0 != my_inode[i]) {
       fscheck_perror("ERROR: bad reference count for file.\n");
       exit(1);
     }
