@@ -29,10 +29,10 @@ struct superblock {
 typedef unsigned int uint;                                           
 #define CH_MASK (0xff000000)                                         
 #define CH_GET_CHECKSUM(addr) (((addr) & CH_MASK) >> 24)             
-#define CH_PUT_CHECKSUM(addr, val) \
+#define CH_SET_CHECKSUM(addr, val) \
   ((addr) = (((addr) & (~CH_MASK)) | (((uint)((val) & 0xff)) << 24)))
 #define CH_GET_ADDR(addr) ((addr) & (~CH_MASK))                      
-#define CH_PUT_ADDR(addr, val) \
+#define CH_SET_ADDR(addr, val) \
   ((addr) = (((addr) & (CH_MASK)) | ((val) & (~CH_MASK)) ))          
 
 // On-disk inode structure

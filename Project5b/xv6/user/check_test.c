@@ -23,13 +23,51 @@ typedef unsigned int uint;
     CH_GET_CHECKSUM(test), CH_GET_ADDR(test));
 #endif
 
-int main(int argc, char *arg[]) {
-  int fd = open("test.txt", O_CREATE | O_CHECKED | O_RDWR);
+int main(int argc, char *argv[]) {
+  int fd;
   int ret = 0;
-  printf(1, "%d\n", fd);
-  unsigned char arr[] = {'a', 'b', 'c', 'd'};
-  ret =  write(fd, arr, 4);
-  printf(1, "ret = %d\n", ret);
+  int rd = 1;
+  char *filename = "1.txt";
+  unsigned char arr[1024] = {'a', 'b', 'c', 'd'};
+  unsigned char corrupted_data[1024] = {'~','!','#','$','%','^','&'};
+  
+  if (argc > 1) {
+    if (argv[1][0] == 'r')
+      rd = 1;
+    else if (argv[1][0] == 'w')
+      rd = 0;
+    else if (argv[1][0] == 'c') {
+      /* corrupt the file */
+      rd = -1;
+    }
+  }
+  
+  if (rd == 1) {
+    int i = 0;
+    fd =  open(filename, O_CHECKED | O_RDONLY);
+    if (fd < 0) {
+      printf(2, "%s: Does not exist!\n", filename);
+      exit();
+    }
+    
+    ret = read(fd, arr, 1024);
+    printf(1, "read ret = %d\n", ret);
+    for(i = 0; i < 1024; ++i) {
+      if (arr[i]) {
+        printf(1, "%d:%c, ", i, arr[i]);
+      }
+    }
+  } else if (rd == 0) {
+    fd =  open(filename, O_CREATE | O_CHECKED | O_RDWR);
+    
+    ret =  write(fd, arr, 1024);
+    printf(1, "write ret = %d\n", ret);
+  } else if (rd == -1) {
+    /* corrupt the file */
+    fd =  open(filename, O_CREATE | O_RDWR);
+    ret =  write(fd, corrupted_data, 1024);
+    printf(1, "corrupt write ret = %d\n", ret);
+  }
   close(fd);
   exit();
 }

@@ -23,6 +23,9 @@
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 static void itrunc(struct inode*);
+unsigned char fetch_checksum(struct inode *ip, uint bn);
+void update_checksum(struct inode *ip, uint bn, unsigned char checksum);
+inline unsigned char calculate_checksum(unsigned char *addr, int size);
 
 // Read the super block.
 static void
@@ -361,20 +364,21 @@ itrunc(struct inode *ip)
 
   for(i = 0; i < NDIRECT; i++){
     if(ip->addrs[i]){
-      bfree(ip->dev, ip->addrs[i]);
+      /* get the address part of the pointer */
+      bfree(ip->dev, CH_GET_ADDR(ip->addrs[i]));
       ip->addrs[i] = 0;
     }
   }
   
-  if(ip->addrs[NDIRECT]){
-    bp = bread(ip->dev, ip->addrs[NDIRECT]);
+  if(ip->addrs[NDIRECT]) {
+    bp = bread(ip->dev, CH_GET_ADDR(ip->addrs[NDIRECT]));
     a = (uint*)bp->data;
     for(j = 0; j < NINDIRECT; j++){
       if(a[j])
         bfree(ip->dev, a[j]);
     }
     brelse(bp);
-    bfree(ip->dev, ip->addrs[NDIRECT]);
+    bfree(ip->dev, CH_GET_ADDR(ip->addrs[NDIRECT]));
     ip->addrs[NDIRECT] = 0;
   }
 
@@ -382,6 +386,31 @@ itrunc(struct inode *ip)
   iupdate(ip);
 }
 
+unsigned char
+calculate_file_checksum(struct inode *ip)
+{
+  unsigned char result = 0;
+  uint *addr;
+  struct buf *bp = NULL;
+
+  int i = 0;
+  for (i = 0; i < NDIRECT; ++i) {
+    result = result ^ (CH_GET_CHECKSUM(ip->addrs[i]));
+  }
+
+  if (ip->addrs[NDIRECT] != 0) {
+    bp = bread(ip->dev, CH_GET_ADDR(ip->addrs[NDIRECT]));
+    addr = (uint *) bp->data;
+    for (i = 0; i < BSIZE / sizeof(uint); ++i) {
+      result = result ^ (CH_GET_CHECKSUM(addr[i]));
+    }
+  }
+
+  if (bp) {
+    brelse(bp);
+  }
+  return result;
+}
 // Copy stat information from inode.
 void
 stati(struct inode *ip, struct stat *st)
@@ -391,6 +420,7 @@ stati(struct inode *ip, struct stat *st)
   st->type = ip->type;
   st->nlink = ip->nlink;
   st->size = ip->size;
+  st->checksum = calculate_file_checksum(ip);
 }
 
 // Read data from inode.
@@ -411,11 +441,31 @@ readi(struct inode *ip, char *dst, uint off, uint n)
   if(off + n > ip->size)
     n = ip->size - off;
 
-  for(tot=0; tot<n; tot+=m, off+=m, dst+=m){
-    bp = bread(ip->dev, bmap(ip, off/BSIZE));
-    m = min(n - tot, BSIZE - off%BSIZE);
-    memmove(dst, bp->data + off%BSIZE, m);
-    brelse(bp);
+  if (ip->type == T_CHECKED) {
+    /* for checksum based files */
+    for(tot=0; tot<n; tot+=m, off+=m, dst+=m) {
+      bp = bread(ip->dev, bmap(ip, off/BSIZE));
+      m = min(n - tot, BSIZE - off%BSIZE);
+      
+      //cprintf("kernel: Calc checksum = %x | stored checksum = %x\n",
+      //calculate_checksum(bp->data, BSIZE), fetch_checksum(ip, off/BSIZE));
+      if (calculate_checksum(bp->data, BSIZE) != fetch_checksum(ip, off/BSIZE)) 
+      {
+        //cprintf("kernel: Invalid checksum ! File corrupted!\n");
+        brelse(bp);
+        return -1;
+      }
+      memmove(dst, bp->data + off%BSIZE, m);
+      brelse(bp);
+    }
+  } else {
+    /* For regular files */
+    for(tot=0; tot<n; tot+=m, off+=m, dst+=m) {
+      bp = bread(ip->dev, bmap(ip, off/BSIZE));
+      m = min(n - tot, BSIZE - off%BSIZE);
+      memmove(dst, bp->data + off%BSIZE, m);
+      brelse(bp);
+    }
   }
   return n;
 }
@@ -432,13 +482,68 @@ calculate_checksum(unsigned char *addr, int size)
   return result;
 }
 
+void
+update_checksum(struct inode *ip, uint bn, unsigned char checksum)
+{
+  uint addr = 0, *a;
+  struct buf *bp;
+
+  if(bn < NDIRECT){
+    CH_SET_CHECKSUM((ip->addrs[bn]), checksum);
+    return; 
+  }
+  bn -= NDIRECT;
+
+  if(bn < NINDIRECT){
+    /* Load indirect block */
+    addr = CH_GET_ADDR(ip->addrs[NDIRECT]);
+    /* prune the check sum and then read the block */
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    /* Update the checksum in main memory */
+    CH_SET_CHECKSUM(a[bn], checksum);
+    /* write the update to disk */
+    bwrite(bp);
+    brelse(bp);
+    return;
+  }
+
+  panic("bmap: out of range");
+}
+
+unsigned char
+fetch_checksum(struct inode *ip, uint bn)
+{
+  uint addr = 0, *a;
+  unsigned char ret = 0;
+  struct buf *bp;
+
+  if(bn < NDIRECT){
+    return CH_GET_CHECKSUM((ip->addrs[bn]));
+  }
+  bn -= NDIRECT;
+
+  if(bn < NINDIRECT){
+    /* Load indirect block */
+    addr = CH_GET_ADDR(ip->addrs[NDIRECT]);
+    /* prune the check sum and then read the block */
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    ret = CH_GET_CHECKSUM(a[bn]);
+    brelse(bp);
+    return ret;
+  }
+
+  panic("bmap: out of range");
+}
+
 // Write data to inode.
 int
 writei(struct inode *ip, char *src, uint off, uint n)
 {
   uint tot, m;
   struct buf *bp;
-  unsigned char checksum_update = 0, checksum;
+  unsigned char checksum_updated = 0, checksum;
 
   if(ip->type == T_DEV){
     if(ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].write)
@@ -453,16 +558,21 @@ writei(struct inode *ip, char *src, uint off, uint n)
 
   if (ip->type == T_CHECKED) {
     /* For checksum based files */
-    cprintf("CHECKED FILE\n");
+    //cprintf("kernel:CHECKED FILE\n");
     for(tot=0; tot<n; tot+=m, off+=m, src+=m){
       bp = bread(ip->dev, bmap(ip, off/BSIZE));
       m = min(n - tot, BSIZE - off%BSIZE);
       memmove(bp->data + off%BSIZE, src, m);
 
       checksum = calculate_checksum(bp->data, BSIZE);
-      cprintf("Calculated checksum = %x\n", checksum);
-      // update_checksum(ip, off/BSIZE /* block number */, checksum);
-
+      //cprintf("kernel:Calculated checksum = %x\n", checksum);
+      update_checksum(ip, off / BSIZE /* block number */, checksum);
+      checksum_updated = 1;
+      /* To corrupt the data */
+      #if 0
+      src[0] = '@';
+      memmove(bp->data + off%BSIZE, src, m);
+      #endif
       bwrite(bp);
       brelse(bp);
     }
@@ -478,8 +588,9 @@ writei(struct inode *ip, char *src, uint off, uint n)
   }
   
   /* If checksum updated, then reflect it in disk */
-  if(checksum_update || (n > 0 && off > ip->size)) {
+  if(checksum_updated || (n > 0 && off > ip->size)) {
     ip->size = off;
+    //cprintf("kernel:Updating the inode pointer\n");
     iupdate(ip);
   }
   return n;
