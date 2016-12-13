@@ -22,6 +22,19 @@ struct superblock {
 #define NINDIRECT (BSIZE / sizeof(uint))
 #define MAXFILE (NDIRECT + NINDIRECT)
 
+/* Checksums are kept in the higher 8-bits of the address.
+ * | checksum | byte 2 | byte 1 | byte 0 |
+ */
+
+typedef unsigned int uint;                                           
+#define CH_MASK (0xff000000)                                         
+#define CH_GET_CHECKSUM(addr) (((addr) & CH_MASK) >> 24)             
+#define CH_PUT_CHECKSUM(addr, val) \
+  ((addr) = (((addr) & (~CH_MASK)) | (((uint)((val) & 0xff)) << 24)))
+#define CH_GET_ADDR(addr) ((addr) & (~CH_MASK))                      
+#define CH_PUT_ADDR(addr, val) \
+  ((addr) = (((addr) & (CH_MASK)) | ((val) & (~CH_MASK)) ))          
+
 // On-disk inode structure
 struct dinode {
   short type;           // File type

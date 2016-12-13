@@ -325,7 +325,8 @@ bmap(struct inode *ip, uint bn)
   if(bn < NDIRECT){
     if((addr = ip->addrs[bn]) == 0)
       ip->addrs[bn] = addr = balloc(ip->dev);
-    return addr;
+    /* return the address by pruning the checksum */
+    return CH_GET_ADDR(addr);
   }
   bn -= NDIRECT;
 
@@ -333,14 +334,16 @@ bmap(struct inode *ip, uint bn)
     // Load indirect block, allocating if necessary.
     if((addr = ip->addrs[NDIRECT]) == 0)
       ip->addrs[NDIRECT] = addr = balloc(ip->dev);
-    bp = bread(ip->dev, addr);
+    /* prune the check sum and then read the block */
+    bp = bread(ip->dev, CH_GET_ADDR(addr));
     a = (uint*)bp->data;
     if((addr = a[bn]) == 0){
       a[bn] = addr = balloc(ip->dev);
       bwrite(bp);
     }
     brelse(bp);
-    return addr;
+    /* return the address by pruning the checksum */
+    return CH_GET_ADDR(addr);
   }
 
   panic("bmap: out of range");
@@ -417,12 +420,25 @@ readi(struct inode *ip, char *dst, uint off, uint n)
   return n;
 }
 
+
+inline unsigned char
+calculate_checksum(unsigned char *addr, int size)
+{
+  unsigned char result = 0;
+  int i = 0;
+  for (i = 0; i < size; ++i) {
+    result = result ^ addr[i];
+  }
+  return result;
+}
+
 // Write data to inode.
 int
 writei(struct inode *ip, char *src, uint off, uint n)
 {
   uint tot, m;
   struct buf *bp;
+  unsigned char checksum_update = 0, checksum;
 
   if(ip->type == T_DEV){
     if(ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].write)
@@ -435,15 +451,34 @@ writei(struct inode *ip, char *src, uint off, uint n)
   if(off + n > MAXFILE*BSIZE)
     n = MAXFILE*BSIZE - off;
 
-  for(tot=0; tot<n; tot+=m, off+=m, src+=m){
-    bp = bread(ip->dev, bmap(ip, off/BSIZE));
-    m = min(n - tot, BSIZE - off%BSIZE);
-    memmove(bp->data + off%BSIZE, src, m);
-    bwrite(bp);
-    brelse(bp);
-  }
+  if (ip->type == T_CHECKED) {
+    /* For checksum based files */
+    cprintf("CHECKED FILE\n");
+    for(tot=0; tot<n; tot+=m, off+=m, src+=m){
+      bp = bread(ip->dev, bmap(ip, off/BSIZE));
+      m = min(n - tot, BSIZE - off%BSIZE);
+      memmove(bp->data + off%BSIZE, src, m);
 
-  if(n > 0 && off > ip->size){
+      checksum = calculate_checksum(bp->data, BSIZE);
+      cprintf("Calculated checksum = %x\n", checksum);
+      // update_checksum(ip, off/BSIZE /* block number */, checksum);
+
+      bwrite(bp);
+      brelse(bp);
+    }
+  } else {
+    /* Regular files will continue to work as before */
+    for(tot=0; tot<n; tot+=m, off+=m, src+=m){
+      bp = bread(ip->dev, bmap(ip, off/BSIZE));
+      m = min(n - tot, BSIZE - off%BSIZE);
+      memmove(bp->data + off%BSIZE, src, m);
+      bwrite(bp);
+      brelse(bp);
+    }
+  }
+  
+  /* If checksum updated, then reflect it in disk */
+  if(checksum_update || (n > 0 && off > ip->size)) {
     ip->size = off;
     iupdate(ip);
   }
