@@ -420,7 +420,9 @@ stati(struct inode *ip, struct stat *st)
   st->type = ip->type;
   st->nlink = ip->nlink;
   st->size = ip->size;
-  st->checksum = calculate_file_checksum(ip);
+  if (ip->type == T_CHECKED) {
+    st->checksum = calculate_file_checksum(ip);
+  }
 }
 
 // Read data from inode.
