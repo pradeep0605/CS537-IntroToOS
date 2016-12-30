@@ -1,0 +1,168 @@
+commit a75626cc9d0c13f9e346feee16094208d24798d1
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Thu Dec 29 17:15:27 2016 -0600
+
+    Fixing long write system calls
+
+commit ed81240307a362d75160843d7bef5773970bbbf5
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Tue Sep 20 19:23:42 2016 -0500
+
+    This is probably is the final optimization:
+    
+    When writing the sorted array back to disk, there were two writes. This means
+    that there were two system calls happening for one record. To reduce the number
+    of write system calls, I made the rarray[i].data_ptr to point to the record
+    itself in the main memory (Remember that entire file is read into the main
+    memory at once). So this pointer will act as a location in the memory where the
+    entire record's information is sotred. This will help us to write() the entire
+    record at once using this pointer with only one system call (write()).
+
+commit 49f718890647c1a123ce7ba3478bd6b692308000
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Sun Sep 18 14:24:39 2016 -0500
+
+    Adding O_TRUNK flag while opening the file. This is helpful when the output file already exists. Your program should produce the sorted output corresponding to the input file (Output file previously might contain anything
+
+commit ec805a068b096d3c1d5836b0f200e8157920ff42
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Sat Sep 17 16:51:56 2016 -0500
+
+    Adding one more optimization of writing key and data_ints together. This would
+    help me reduce the number of write calls by R
+
+commit ef1140e7b6284cf84938846ffa8bf13c501cda33
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Sat Sep 17 16:31:15 2016 -0500
+
+    Making the program to expect only 4 arguments i.e. -i inputfile -o outputfile
+    Anything other than this should not be accepted.
+
+commit ba6a99e21794f7dee1480b8bce603a65cbc65996
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Sat Sep 17 15:52:15 2016 -0500
+
+    Adding other supporing files to the project.
+
+commit 59eb1b16790eb77a984287262c0d2a68e35a6df2
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Sat Sep 17 15:50:29 2016 -0500
+
+    Few beautification changes
+
+commit 1b913acbaab9b27d9c7e9bcbb0ac0a91d94283b3
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Sat Sep 17 15:35:16 2016 -0500
+
+    This check-in coverts the entire file to 2-spaced indenting.
+    It also modifies few comments and updates the name rarray_base to rarray for
+    simplicity.
+
+commit c0406c06e0ff204f66827dd8536b11c91804666d
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Sat Sep 17 15:18:38 2016 -0500
+
+    This check-in contains
+    1. An optimization to just convert the pointer given to the comparator fucntion
+    by type casting it to (uint*) as the record structure has key as the first
+    element. So first four bytes would be key. Hence, using just an uint would be
+    better to use (though looks really weird and not intutive).
+    
+    2. Add a boundary condition where the data_ints (number of integers present in
+    the data) might be zero. In that case, the data_ptr should point to NULL and
+    while writing to disk, we should check data_ptr, for every record, to be NULL or
+    not.
+
+commit 49473811964aa9d70fee44955f6046b8c20e2386
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Fri Sep 16 17:49:47 2016 -0500
+
+    Taking abackup of working program
+
+commit 0c51ea1fea56b54593bdf1b300060e96017992c8
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Fri Sep 16 17:44:42 2016 -0500
+
+    ONE BIG CHECKIN : This change is working for test cases given by the prof. Should be good for handing it down
+
+commit 2f8ea20855adf0ede569eeae2850b14715e82491
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Thu Sep 15 20:59:10 2016 -0500
+
+    add -Werror into the make file
+
+commit b1d9295a60e4b5e602d0c6138cf79cae0a2c7caa
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Thu Sep 15 18:01:19 2016 -0500
+
+    The scanning and parsing of the entire file is completed with this checkin.
+    
+    Basically A big memory is allocated which holds array of rec_dataptr_t and then
+    the memory hold the contents of the entire file. Then, a scan is done over the
+    memory to populate the record array with the record releted data from the
+    contents of the file. To verify this, prints has been added.
+
+commit 64e9a4afdd2a0dd2bd10426760d29386ed3b7c89
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Thu Sep 15 13:54:49 2016 -0500
+
+    Checking-in the proper parsing of the input arguments
+
+commit d7c36d711e0d188d2b3053588655b603a87cf3ea
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Thu Sep 15 13:53:48 2016 -0500
+
+    adding debug target to the Makefile
+
+commit d70d75f270d2a285336382ace93b0f3aff63e69b
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Thu Sep 15 13:22:22 2016 -0500
+
+    Adding Make file into the project
+
+commit 8a5294f74369461b20faff704b6ed274ca15ae90
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Thu Sep 15 13:08:01 2016 -0500
+
+    Adding the actual varsort.c file into the repository
+
+commit e1c864041205d4599f9f05164092855bb55e339b
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Thu Sep 15 12:38:17 2016 -0500
+
+    Adding other supporting files for the project.
+
+commit 91456fe95268304a72bd4cde45a32e435a14f9ac
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Thu Sep 15 11:54:53 2016 -0500
+
+    Adding supporting files for the project
+
+commit 11832b4535116bd5d8e9f514603d509febd1f0f5
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Wed Sep 14 20:43:10 2016 -0500
+
+    include inbuilt qsort to do further comparisions
+
+commit 0849de9c73249724b4b1f36f3f0c18d9b3ce479b
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Wed Sep 14 20:23:22 2016 -0500
+
+    Making the files available in the git repository.
+
+commit 75434fb9dc914fb0064e9f49754c4446fd7fd643
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Wed Sep 14 20:19:38 2016 -0500
+
+    Created two files with regular quick sort and the modified quick sort
+    to invoke threads when the partition size is greater than 100,000.
+    This will be the base to the actual project. Have done lot of experiments and
+    the thread based model works for larger inputs like tens and hundreds of million
+    entires. Enjoy !
+
+commit 7b6b60c43990b713e13263729b4e1ae477751371
+Author: Pradeep Kashyap Ramaswamy <pradeep.kashyap@wisc.edu>
+Date:   Wed Sep 14 17:21:43 2016 -0500
+
+    Basic quick sort has been implemented in varsort.c file.
+    The random_generator.c is used to generate random numbers
