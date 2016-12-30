@@ -1,0 +1,44 @@
+diff --git a/kernel/syscall.c b/kernel/syscall.c
+index c9f7a6b..830d1f3 100644
+--- a/kernel/syscall.c
++++ b/kernel/syscall.c
+@@ -17,7 +17,7 @@
+ int
+ fetchint(struct proc *p, uint addr, int *ip)
+ {
+-  if(addr >= p->sz || addr+4 > p->sz)
++  if(addr >= USERTOP /* p->sz */ || addr+4 > USERTOP /* p->sz */)
+     return -1;
+   *ip = *(int*)(addr);
+   return 0;
+@@ -31,7 +31,7 @@ fetchstr(struct proc *p, uint addr, char **pp)
+ {
+   char *s, *ep;
+ 
+-  if(addr >= p->sz)
++  if(addr >= USERTOP /* p->sz */)
+     return -1;
+   *pp = (char*)addr;
+   ep = (char*)p->sz;
+@@ -58,7 +58,7 @@ argptr(int n, char **pp, int size)
+   
+   if(argint(n, &i) < 0)
+     return -1;
+-  if((uint)i >= proc->sz || (uint)i+size > proc->sz)
++  if((uint)i >= USERTOP /* proc->sz */ || (uint)i+size > USERTOP /* proc->sz */)
+     return -1;
+   *pp = (char*)i;
+   return 0;
+diff --git a/kernel/vm.c b/kernel/vm.c
+index 8af8800..7dca86a 100644
+--- a/kernel/vm.c
++++ b/kernel/vm.c
+@@ -231,7 +231,7 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
+   char *mem;
+   uint a;
+ 
+-  if(newsz > USERTOP)
++  if(newsz > proc->spages_info.current_top)
+     return 0;
+   if(newsz < oldsz)
+     return oldsz;
