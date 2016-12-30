@@ -1,0 +1,104 @@
+#include "cs537.h"
+#include "request.h"
+#include <pthread.h>
+
+// 
+// server.c: A very, very simple web server
+//
+// To run:
+//  server <portnum (above 2000)>
+//
+// Repeatedly handles HTTP requests sent to this port number.
+// Most of the work is done within routines written in request.c
+//
+
+// CS537: Parse the new arguments too
+typedef struct connection_information {
+  int conn_fd; // connection file descriptor. 
+} conn_info_t;
+
+
+int port = 0, n_threads = 0, n_buffers = 0;
+/* All these threads are dynamically allocated */
+pthread_t **cnsmr_theads;
+conn_info_t *buffer;
+
+
+void getargs(int argc, char *argv[], int *port, int *n_threads, int *n_buffers)
+{
+    if (argc != 4) {
+      fprintf(stderr, "Usage: %s <port> <threads> <buffers>\n", argv[0]);
+      exit(1);
+    }
+    *port = atoi(argv[1]);
+    *n_threads = atoi(argv[2]);
+    *n_buffers = atoi(argv[3]);
+
+    if (!(*port && *n_threads && *n_buffers)) {
+      fprintf(stderr, "Usage: %s <port> <threads> <buffers>\n", argv[0]);
+      exit(1);
+    }
+}
+
+void *connection_consumer(void *arg) {
+}
+
+int main(int argc, char *argv[])
+{
+    int listenfd, connfd, clientlen;
+    struct sockaddr_in clientaddr;
+    int i = 0;
+
+    getargs(argc, argv, &port, &n_threads, &n_buffers);
+
+    cnsmr_theads = (pthread_t **) malloc(sizeof(pthread_t *) * n_threads);
+    if (!cnsmr_theads) {
+      goto exit;
+    }
+
+    for (i = 0; i < n_threads; ++i) {
+      cnsmr_theads[i] = (pthread *) malloc(sozeof(pthread_t));
+      if (!cnsmr_theads[i]) {
+        thread_create(cnsmr_theads[i], NULL, connection_consumer, NULL);
+      } else {
+        goto free_cnsmr_threads;
+      }
+    }
+
+    buffer = (conn_info_t *) malloc(sizeof(conn_info_t) * n_buffers);
+
+    // 
+    // CS537: Create some threads...
+    //
+
+
+    listenfd = Open_listenfd(port);
+    while (1) {
+      clientlen = sizeof(clientaddr);
+      connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
+
+      // 
+      // CS537: In general, don't handle the request in the main thread.
+      // Save the relevant info in a buffer and have one of the worker threads 
+      // do the work. 
+      // 
+      requestHandle(connfd);
+
+      Close(connfd);
+    }
+    return 0;
+    
+    for (i = 0; i < n_threads; ++i) {
+      free(cnsmr_theads[i]);
+    }
+free_cnsmr_threads:
+    free(cnsmr_theads);
+exit:
+    return 1;
+}
+
+
+    
+
+
+ 

@@ -1,0 +1,90 @@
+Accept	cs537.c	/^int Accept(int s, struct sockaddr *addr, socklen_t/
+Bind	cs537.c	/^void Bind(int sockfd, struct sockaddr *my_addr, in/
+Close	cs537.c	/^void Close(int fd) $/
+Connect	cs537.c	/^void Connect(int sockfd, struct sockaddr *serv_add/
+DEF_MODE	cs537.h	30
+DEF_UMASK	cs537.h	31
+Dup2	cs537.c	/^int Dup2(int fd1, int fd2) $/
+Execve	cs537.c	/^void Execve(const char *filename, char *const argv/
+Fork	cs537.c	/^pid_t Fork(void) $/
+Fstat	cs537.c	/^void Fstat(int fd, struct stat *buf) $/
+Gethostbyaddr	cs537.c	/^struct hostent *Gethostbyaddr(const char *addr, in/
+Gethostbyname	cs537.c	/^struct hostent *Gethostbyname(const char *name) $/
+Gethostname	cs537.c	/^int Gethostname(char *name, size_t len) $/
+LISTENQ	cs537.h	57
+Listen	cs537.c	/^void Listen(int s, int backlog) $/
+Lseek	cs537.c	/^off_t Lseek(int fildes, off_t offset, int whence) /
+MAXBUF	cs537.h	56
+MAXLINE	cs537.h	55
+Mclient	client.c	/^int main(int argc, char *argv[])$/
+Mmap	cs537.c	/^void *Mmap(void *addr, size_t len, int prot, int f/
+Moutput	output.c	/^int main(int argc, char *argv[])$/
+Mserver	server.c	/^int main(int argc, char *argv[])$/
+Munmap	cs537.c	/^void Munmap(void *start, size_t length) $/
+Open	cs537.c	/^int Open(const char *pathname, int flags, mode_t m/
+Open_clientfd	cs537.c	/^int Open_clientfd(char *hostname, int port) $/
+Open_listenfd	cs537.c	/^int Open_listenfd(int port) $/
+RIO_BUFSIZE	cs537.h	41
+Read	cs537.c	/^ssize_t Read(int fd, void *buf, size_t count) $/
+Rio_readinitb	cs537.c	/^void Rio_readinitb(rio_t *rp, int fd)$/
+Rio_readlineb	cs537.c	/^ssize_t Rio_readlineb(rio_t *rp, void *usrbuf, siz/
+Rio_readn	cs537.c	/^ssize_t Rio_readn(int fd, void *ptr, size_t nbytes/
+Rio_readnb	cs537.c	/^ssize_t Rio_readnb(rio_t *rp, void *usrbuf, size_t/
+Rio_writen	cs537.c	/^void Rio_writen(int fd, void *usrbuf, size_t n) $/
+SA	cs537.h	36
+Select	cs537.c	/^int Select(int  n, fd_set *readfds, fd_set *writef/
+Setenv	cs537.c	/^int Setenv(const char *name, const char *value, in/
+Setsockopt	cs537.c	/^void Setsockopt(int s, int level, int optname, con/
+Socket	cs537.c	/^int Socket(int domain, int type, int protocol) $/
+Stat	cs537.c	/^void Stat(const char *filename, struct stat *buf) /
+Time_GetSeconds	output.c	/^double Time_GetSeconds() {$/
+Wait	cs537.c	/^pid_t Wait(int *status) $/
+Write	cs537.c	/^ssize_t Write(int fd, const void *buf, size_t coun/
+__CSAPP_H__	cs537.h	2
+app_error	cs537.c	/^void app_error(char *msg) \/* application error *\/$/
+buffer	server.c	23
+clientPrint	client.c	/^void clientPrint(int fd)$/
+clientSend	client.c	/^void clientSend(int fd, char *filename)$/
+cnsmr_theads	server.c	29
+conn_fd	server.c	17
+conn_info_t	server.c	19
+connection_consumer	server.c	/^void *connection_consumer(void *arg) {$/
+connection_information	server.c	16
+dns_error	cs537.c	/^void dns_error(char *msg) \/* dns-style error *\/$/
+empty	server.c	32
+fill_acount	server.c	24
+full	server.c	32
+get_buffer	server.c	/^int get_buffer() {$/
+getargs	output.c	/^void getargs()$/
+getargs	server.c	/^void getargs(int argc, char *argv[], int *port, in/
+in_use	server.c	18
+lock	server.c	22
+main_lock	server.c	30
+open_clientfd	cs537.c	/^int open_clientfd(char *hostname, int port) $/
+open_listenfd	cs537.c	/^int open_listenfd(int port) $/
+port	server.c	27
+posix_error	cs537.c	/^void posix_error(int code, char *msg) \/* posix-sty/
+put_buffer	server.c	/^int put_buffer() {$/
+requestError	request.c	/^void requestError(int fd, char *cause, char *errnu/
+requestGetFiletype	request.c	/^void requestGetFiletype(char *filename, char *file/
+requestHandle	request.c	/^void requestHandle(int fd)$/
+requestParseURI	request.c	/^int requestParseURI(char *uri, char *filename, cha/
+requestReadhdrs	request.c	/^void requestReadhdrs(rio_t *rp)$/
+requestServeDynamic	request.c	/^void requestServeDynamic(int fd, char *filename, c/
+requestServeStatic	request.c	/^void requestServeStatic(int fd, char *filename, in/
+rio_buf	cs537.h	46
+rio_bufptr	cs537.h	45
+rio_cnt	cs537.h	44
+rio_fd	cs537.h	43
+rio_read	cs537.c	/^static ssize_t rio_read(rio_t *rp, char *usrbuf, s/
+rio_readinitb	cs537.c	/^void rio_readinitb(rio_t *rp, int fd) $/
+rio_readlineb	cs537.c	/^ssize_t rio_readlineb(rio_t *rp, void *usrbuf, siz/
+rio_readn	cs537.c	/^ssize_t rio_readn(int fd, void *usrbuf, size_t n) /
+rio_readnb	cs537.c	/^ssize_t rio_readnb(rio_t *rp, void *usrbuf, size_t/
+rio_t	cs537.h	47
+rio_writen	cs537.c	/^ssize_t rio_writen(int fd, void *usrbuf, size_t n)/
+shared_buf_t	server.c	25
+shared_buffer	server.c	21
+shared_buffer	server.c	31
+spinfor	output.c	13
+unix_error	cs537.c	/^void unix_error(char *msg) \/* unix-style error *\/$/

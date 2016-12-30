@@ -1,0 +1,2 @@
+ctags `ls *.[chSs]`
+
