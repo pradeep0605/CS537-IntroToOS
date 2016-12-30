@@ -1,0 +1,60 @@
+.LFB0	test.s	/^.LFB0:$/
+.LFE0	test.s	/^.LFE0:$/
+HASH_SIZE	mysh.c	15
+Mmysh	mysh.c	/^int main(int argc, char *argv[]) {$/
+Moutput	output.c	/^int main(int argc, char *argv[]) {$/
+Mtest	test.s	/^main:$/
+STDIN_SIZE	mysh.c	16
+USEC_FROM_TIMEVAL	mysh.c	/^#define USEC_FROM_TIMEVAL(timeval) \\$/
+bg	mysh.c	32
+bool	linked_list.h	4
+bool	mysh.c	13
+command	mysh.c	33
+compare	mysh.c	/^bool compare(void *key, void *cmp) {$/
+create_new_node	linked_list.c	/^static node_t * create_new_node(void *data) {$/
+data	linked_list.h	12
+dec_global_jid	mysh.c	/^inline void dec_global_jid() {$/
+execute_inbuilt_command	mysh.c	/^int execute_inbuilt_command(char **args, int nargs/
+execute_job	mysh.c	/^void execute_job(job_t *job) {$/
+exit_gracefully	mysh.c	/^void exit_gracefully(int exit_val) {$/
+false	linked_list.h	2
+for_each_node	linked_list.h	/^#define for_each_node(itr, ll) \\$/
+get_global_jid	mysh.c	/^inline int get_global_jid() {$/
+global_jid	mysh.c	40
+hash_func	mysh.c	/^inline int hash_func(int jid) {$/
+head	linked_list.h	16
+inc_global_jid	mysh.c	/^inline void inc_global_jid() {$/
+infile	mysh.c	43
+is_inbuilt_command	mysh.c	/^int is_inbuilt_command(char **args, int nargs) {$/
+jid	mysh.c	30
+job	mysh.c	29
+job_hash	mysh.c	42
+job_t	mysh.c	34
+jobs_mutex	mysh.c	41
+linked_list	linked_list.h	15
+linked_list_t	linked_list.h	18
+ll_delete_head	linked_list.c	/^void ll_delete_head(linked_list_t *ll) {$/
+ll_delete_node	linked_list.c	/^void ll_delete_node(linked_list_t *ll, void *key) /
+ll_delete_tail	linked_list.c	/^void ll_delete_tail(linked_list_t *ll) {$/
+ll_display	linked_list.c	/^void ll_display(linked_list_t *ll) {$/
+ll_find	linked_list.c	/^node_t * ll_find(linked_list_t *ll, void *key,$/
+ll_free	linked_list.c	/^void ll_free(linked_list_t *ll) {$/
+ll_initialize	linked_list.c	/^void ll_initialize(linked_list_t *ll) {$/
+ll_insert_head	linked_list.c	/^void ll_insert_head(linked_list_t *ll, void *data)/
+ll_insert_tail	linked_list.c	/^void ll_insert_tail(linked_list_t *ll, void *data)/
+ll_size	linked_list.c	/^int ll_size(linked_list_t *ll) {$/
+mysh_perror	mysh.c	/^#define mysh_perror(format, ...) \\$/
+mysh_printf	mysh.c	/^#define mysh_printf(format, ...) \\$/
+next	linked_list.h	11
+node	linked_list.h	9
+node_t	linked_list.h	13
+output	mysh.c	38
+pid	mysh.c	31
+prev	linked_list.h	10
+process_line	mysh.c	/^void process_line(char *s, bool batch_mode) {$/
+prune_line	mysh.c	/^void prune_line(char *s) {$/
+read_line	mysh.c	/^void read_line(char *s, FILE *infile) {$/
+shell	mysh.c	39
+tail	linked_list.h	17
+trim_line	mysh.c	/^void trim_line(char *s) {$/
+true	linked_list.h	1
