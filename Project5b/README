@@ -1,0 +1,5 @@
+This Project is implemented in XV6 kernel. The aim of the project is to provide a means of detection of file corruption.
+Checksum is stored for Each of the blocks in the file. While writing to the disk, checksum is calculated and stored in the higher 8-bits
+of the pointer. When reading a block, its checksum is calculated again and compared with the stored checksum in the pointer. If the
+checksums do not match, then it means that the block has been corrupted. The corroupted blocks are not read to the user buffer; -1 is returned 
+to the user application.
